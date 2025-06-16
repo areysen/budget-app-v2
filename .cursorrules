@@ -1,0 +1,494 @@
+# Cursor AI Rules for Budget App v2
+
+You are an expert TypeScript developer working on a Next.js 15 budgeting application called "Budget App v2".
+
+## Project Overview
+
+This is a paycheck-period focused, zero-based budgeting app with envelope method for spending categories. The app is designed for household sharing (primary user + spouse) with AI-powered insights and recommendations.
+
+### Core Concepts
+
+- **Paycheck Periods**: Semi-monthly budget cycles (15th + EOM)
+- **Envelopes**: Spending categories with allocated amounts per period
+- **Fixed Expenses**: Recurring bills (rent, utilities, etc.)
+- **Savings Goals**: Long-term accumulation targets (emergency fund, vacation, etc.)
+- **Dual Transaction System**: Plaid imports + user transactions as source of truth
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with App Router and TypeScript
+- **Database**: Supabase with Row Level Security (RLS)
+- **Banking**: Plaid integration for transaction import
+- **UI**: Tailwind CSS + shadcn/ui components
+- **Notifications**: react-hot-toast
+- **Icons**: lucide-react
+
+## Database Schema Knowledge
+
+### Core Tables
+
+```
+profiles - User accounts (extends Supabase auth)
+households - Shared budget groups
+household_members - User permissions within households
+paycheck_periods - Budget periods with start/end dates
+period_income - Income sources per period
+envelopes - Master spending category definitions
+period_envelopes - Envelope allocations per period
+fixed_expenses - Recurring bill definitions
+period_fixed_expenses - Fixed expenses per period
+savings_goals - Long-term savings targets
+savings_contributions - Contributions to goals per period
+plaid_transactions - Raw bank transaction imports
+user_transactions - Source of truth transactions with envelope assignments
+ai_recommendations - AI suggestions and insights
+spending_insights - Pattern analysis and trends
+```
+
+### Key Relationships
+
+- All data is scoped to `household_id` via RLS
+- Transactions link to envelopes, fixed_expenses, or savings_goals
+- Periods contain allocations and track spending
+- AI tables store recommendations and insights
+
+## Code Standards
+
+### TypeScript
+
+- Use strict typing always
+- Import types from `@/types/supabase`
+- Define proper interfaces for all components
+- Use proper return types for functions
+- No `any` types unless absolutely necessary
+
+### Database Patterns
+
+- Always use household-scoped queries via RLS
+- Use generated types from `@/types/supabase`
+- Import clients from `@/lib/supabase/client` (browser) or `@/lib/supabase/server` (SSR)
+- Handle loading states and errors gracefully
+- Use optimistic updates for better UX
+
+### Component Patterns
+
+- Use shadcn/ui components from `@/components/ui`
+- Import `cn` utility from `@/lib/utils` for className merging
+- Follow atomic design principles (atoms → molecules → organisms)
+- Implement proper loading skeletons and error boundaries
+- Use Suspense boundaries appropriately
+
+### API Routes
+
+- Use Next.js App Router API conventions (`app/api/...`)
+- Implement proper error handling and status codes
+- Use TypeScript for request/response types
+- Follow RESTful principles
+- Validate input data
+
+### Styling
+
+- Use Tailwind CSS utility classes
+- Follow mobile-first responsive design
+- Use consistent spacing from design system (4, 8, 12, 16, 24px)
+- Implement proper contrast ratios for accessibility
+- Use semantic color classes (destructive, muted, etc.)
+
+## Design System - Friendly & Approachable
+
+### Design Philosophy
+
+"Make budgeting feel positive, approachable, and achievable" - reduce financial anxiety through warm, friendly design.
+
+### Color Palette
+
+```css
+/* Primary Colors */
+--primary: #3b82f6 (bright blue)
+--success: #10b981 (mint green)
+--warning: #f97316 (warm orange)
+--error: #ef4444 (clear red)
+
+/* Backgrounds */
+--background: #ffffff (pure white)
+--background-soft: #f8fafc (soft gray cards)
+--background-muted: #f1f5f9 (muted backgrounds)
+
+/* Envelope Colors */
+Purple: #8b5cf6, Cyan: #06b6d4, Green: #10b981,
+Amber: #f59e0b, Red: #ef4444, Blue: #3b82f6
+```
+
+### Typography
+
+- **Font**: Inter for UI, SF Mono for currency amounts
+- **Scale**: text-4xl (page titles) → text-xs (captions)
+- **Weights**: Use font-medium for buttons, font-semibold for emphasis
+
+### Spacing & Layout
+
+- **Base unit**: 4px increments (space-1 through space-16)
+- **Card padding**: 24px (space-6)
+- **Border radius**: Friendly rounded corners (radius-lg for cards, radius-2xl for mobile)
+- **Shadows**: Soft, subtle shadows (shadow-sm default, shadow-md on hover)
+
+### Component Patterns
+
+#### Buttons
+
+```jsx
+// Primary button - bright blue with hover effects
+<button className="bg-primary text-white rounded-md px-6 py-3 font-medium shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+
+// Secondary button - soft background with border
+<button className="bg-background-soft text-foreground border border-border rounded-md px-6 py-3 font-medium">
+```
+
+#### Cards
+
+```jsx
+// Standard card - soft shadows and rounded corners
+<div className="bg-white border border-border/50 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+
+// Mobile card - more rounded for mobile-friendly feel
+<div className="bg-white border border-border/50 rounded-2xl p-5 shadow-sm"> // On mobile
+```
+
+#### Progress Bars
+
+```jsx
+// Friendly progress with gradient
+<div className="bg-muted h-2 rounded-full overflow-hidden">
+  <div
+    className="h-full bg-gradient-to-r from-success to-emerald-400 rounded-full transition-all duration-300"
+    style={{ width: `${progress}%` }}
+  />
+</div>
+```
+
+#### Currency Display
+
+```jsx
+// Large currency amounts - use monospace font
+<span className="font-mono font-bold text-3xl text-success">$2,450.78</span>
+
+// Small currency amounts
+<span className="font-mono font-semibold text-foreground">$245.00</span>
+
+// Color coding: text-success (positive), text-error (negative), text-foreground (neutral)
+```
+
+#### Input Fields
+
+```jsx
+// Friendly inputs with focus states
+<input className="bg-white border-2 border-border rounded-md px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors" />
+```
+
+### Mobile Optimizations
+
+- **Touch targets**: Minimum 44px height for buttons
+- **Border radius**: Use rounded-2xl for cards on mobile
+- **Spacing**: Reduce margins to space-4 on mobile
+- **Typography**: Increase button text to text-lg on mobile
+
+### Icon Guidelines
+
+- **Library**: Lucide React icons exclusively
+- **Sizes**: 16px (small), 20px (default), 24px (emphasis)
+- **Stroke width**: 2px for friendly feel
+- **Colors**: Match text color or use accent colors sparingly
+
+### Envelope Styling
+
+```jsx
+// Envelope cards with color indicators
+<div className="bg-white rounded-lg p-4 border-l-4 border-purple-500">
+  <div className="flex items-center gap-2">
+    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+    <span className="font-medium">Groceries</span>
+  </div>
+</div>
+```
+
+### Accessibility Requirements
+
+- **Contrast**: Minimum 4.5:1 for text
+- **Focus**: Always visible 3px blue outline
+- **Motion**: Respect prefers-reduced-motion
+- **Touch**: 44px minimum touch targets
+
+### Implementation Notes
+
+- Use Tailwind utility classes with custom CSS variables
+- Implement hover states with subtle animations (150-300ms)
+- Add loading skeletons with soft gray backgrounds
+- Use toast notifications for user feedback (react-hot-toast)
+- Consider dark mode support in color planning
+
+### Common UI Patterns
+
+```jsx
+// Success state
+<div className="bg-success/10 border border-success/20 rounded-lg p-4 text-success">
+
+// Warning state
+<div className="bg-warning/10 border border-warning/20 rounded-lg p-4 text-warning">
+
+// Error state
+<div className="bg-error/10 border border-error/20 rounded-lg p-4 text-error">
+
+// Muted/disabled state
+<div className="bg-muted text-muted-foreground">
+```
+
+## Key Development Patterns
+
+### Authentication
+
+- Use Supabase Auth with middleware protection
+- Implement route guards for protected pages
+- Handle auth state changes properly
+- Redirect appropriately based on auth status
+
+### Data Fetching
+
+- Prefer React Server Components where possible
+- Use `createClient()` from appropriate supabase file
+- Implement proper error handling with try-catch
+- Show loading states during async operations
+- Cache data appropriately
+
+### State Management
+
+- Use React hooks for local component state
+- Implement optimistic updates for transactions
+- Use Supabase real-time subscriptions where beneficial
+- Keep state close to where it's used
+
+### Error Handling
+
+- Use try-catch blocks in async functions
+- Implement error boundaries for component errors
+- Show user-friendly error messages with toast
+- Log errors appropriately for debugging
+
+## File Organization
+
+### Directory Structure
+
+```
+src/
+├── app/                     # Next.js App Router
+│   ├── (auth)/             # Auth routes group
+│   ├── (dashboard)/        # Protected routes group
+│   ├── api/                # API routes
+│   └── globals.css         # Global styles
+├── components/             # React components
+│   ├── ui/                 # shadcn/ui base components
+│   ├── auth/               # Authentication components
+│   ├── dashboard/          # Dashboard specific components
+│   ├── periods/            # Paycheck period components
+│   ├── envelopes/          # Envelope management components
+│   ├── transactions/       # Transaction components
+│   ├── goals/              # Savings goal components
+│   ├── layout/             # Layout components
+│   └── shared/             # Shared/common components
+├── lib/                    # Utilities and helpers
+│   ├── supabase/           # Database clients
+│   ├── utils/              # Utility functions
+│   ├── ai/                 # AI recommendation logic
+│   └── plaid/              # Plaid integration
+├── hooks/                  # Custom React hooks
+├── types/                  # TypeScript definitions
+└── styles/                 # Additional styles
+```
+
+### Component Naming
+
+- Use PascalCase for components (`DashboardHeader`)
+- Use kebab-case for files (`dashboard-header.tsx`)
+- Group related components in folders
+- Export components as default exports
+
+## Business Logic Patterns
+
+### Paycheck Periods
+
+- Semi-monthly periods: 1st-14th, 15th-EOM
+- Handle Jordan's mom bi-weekly income ($400 every 2 weeks)
+- Conservative budgeting (don't count secondary income until received)
+- Auto-create periods, manual approval required
+
+### Envelope System
+
+- Configurable rollover rules: 'save', 'rollover', 'rollover_limit'
+- Track allocated vs spent amounts
+- Handle overspending with transfer suggestions
+- Support envelope-to-envelope transfers
+
+### Fixed Expenses
+
+- Support variable amounts (utilities that change monthly)
+- Due date tracking and notifications
+- Auto-allocation to relevant periods
+- Mark as paid workflow
+
+### Savings Goals
+
+- Emergency fund priority (minimum $1000)
+- Progress tracking toward targets
+- Multiple contribution types (planned, overflow, roundup)
+- Visual progress indicators
+
+### Transaction Flow
+
+- Plaid imports as pending review
+- Manual entry goes directly to approved
+- AI suggestions for categorization
+- Envelope assignment required for approval
+- Roundup calculation and savings goal assignment
+
+## AI Integration Patterns
+
+### Recommendation Types
+
+- Emergency funding strategies
+- Envelope transfer suggestions
+- Budget optimization advice
+- Spending pattern insights
+- Goal achievement coaching
+
+### Implementation
+
+- Store recommendations with confidence scores
+- Context-aware suggestions based on current situation
+- User feedback loop for learning
+- Proactive insights based on trends
+
+## Common Utilities to Reference
+
+### Date Utilities
+
+```typescript
+// Generate paycheck dates for semi-monthly schedule
+generatePaycheckDates(startDate: Date, endDate: Date)
+
+// Calculate period range from paycheck date
+getPaycheckRange(currentPaycheck: PaycheckDate, nextPaycheck?: PaycheckDate)
+
+// Format dates for display
+formatDisplayDate(date: string | Date)
+formatDateRange(start: string, end: string)
+```
+
+### Currency Utilities
+
+```typescript
+// Format currency consistently
+formatCurrency(amount: number): string
+
+// Parse currency input
+parseCurrency(input: string): number
+```
+
+### Database Helpers
+
+```typescript
+// Get user's household ID
+getUserHousehold(userId: string): Promise<string>
+
+// Update envelope spent amount
+updateEnvelopeSpentAmount(envelopeId: string, periodId: string)
+
+// Calculate goal progress
+calculateGoalProgress(goalId: string): Promise<number>
+```
+
+## Development Workflow
+
+### Database Changes
+
+1. Modify migration files in `supabase/migrations/`
+2. Apply locally: `supabase db reset`
+3. Generate types: `supabase gen types typescript --local > src/types/supabase.ts`
+4. Test changes thoroughly
+5. Deploy: `supabase db push`
+
+### Component Development
+
+1. Start with TypeScript interfaces
+2. Implement accessibility features (ARIA labels, keyboard navigation)
+3. Add proper loading and error states
+4. Test with real data scenarios
+5. Verify mobile responsiveness
+
+### Testing Approach
+
+- Focus on user flows over unit tests
+- Test with realistic data scenarios
+- Verify auth flows work correctly
+- Test mobile and desktop experiences
+- Check accessibility with screen readers
+
+## Environment Variables
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=sandbox
+```
+
+## Important Implementation Notes
+
+### Security
+
+- All data access is protected by RLS based on household membership
+- Never expose service role key in client code
+- Validate all user inputs on server side
+- Use proper CORS settings for production
+
+### Performance
+
+- Use React.memo for expensive components
+- Implement proper loading states
+- Optimize images and assets
+- Use appropriate caching strategies
+
+### Accessibility
+
+- Use semantic HTML elements
+- Implement proper ARIA labels
+- Ensure keyboard navigation works
+- Maintain good color contrast
+- Support screen readers
+
+### User Experience
+
+- Mobile-first responsive design
+- Intuitive navigation patterns
+- Clear visual feedback for actions
+- Consistent error messaging
+- Fast, optimistic updates
+
+## Key Files to Reference
+
+- `src/types/supabase.ts` - Generated database types
+- `src/lib/supabase/client.ts` - Browser Supabase client
+- `src/lib/supabase/server.ts` - Server Supabase client
+- `src/components/ui/` - Base UI components
+- `src/lib/utils.ts` - Utility functions including `cn`
+
+## When in Doubt
+
+1. **Database queries**: Always scope to household_id
+2. **Components**: Use existing shadcn/ui patterns
+3. **Styling**: Follow mobile-first Tailwind patterns
+4. **Types**: Import from generated supabase types
+5. **Errors**: Show user-friendly messages with toast
+6. **Performance**: Optimize for mobile devices first
+
+Remember: This is a household budgeting app focused on paycheck-period budgeting with envelope method. The user experience should be intuitive for both primary user (full access) and secondary user (simplified view). Always consider the real-world usage patterns of busy people managing their money. Every design decision should make budgeting feel less intimidating and more achievable.
