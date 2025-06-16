@@ -1,67 +1,50 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/supabase";
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
+
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => req.cookies.get(name)?.value,
-        set: (name, value, options) => {
-          res.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+        get(name: string) {
+          return req.cookies.get(name)?.value;
         },
-        remove: (name, options) => {
-          res.cookies.set({
-            name,
-            value: "",
-            ...options,
-          });
+        set(name: string, value: string, options: CookieOptions) {
+          res.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          res.cookies.set({ name, value: "", ...options });
         },
       },
     }
   );
 
-  // Refresh session if expired
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Auth routes handling
-  if (req.nextUrl.pathname.startsWith("/auth")) {
-    if (session) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-    return res;
+  const { pathname } = req.nextUrl;
+  const isAuthRoute =
+    pathname.startsWith("/login") || pathname.startsWith("/auth");
+
+  if (!session && !isAuthRoute) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // Protected routes handling
-  if (req.nextUrl.pathname.startsWith("/dashboard")) {
-    if (!session) {
-      return NextResponse.redirect(new URL("/auth/login", req.url));
-    }
-    return res;
+  if (session && pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   return res;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
-  ],
+  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
 };

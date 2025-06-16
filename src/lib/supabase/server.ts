@@ -1,57 +1,43 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { Database } from "@/types/supabase";
+import type { Database } from "@/types/supabase";
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_URL");
-}
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing env.SUPABASE_SERVICE_ROLE_KEY");
-}
+export const createServerSupabaseClient = () => {
+  const cookieStorePromise = cookies();
 
-// Create a Supabase client with the service role key for server-side operations
-export const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
-
-// Create a Supabase client with the user's session for server-side operations
-export async function createServerClient() {
-  const cookieStore = cookies();
-  const supabaseAccessToken =
-    cookieStore.get("supabase-access-token")?.value ?? "";
-  const supabaseRefreshToken =
-    cookieStore.get("supabase-refresh-token")?.value ?? "";
-
-  return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-      global: {
-        headers: {
-          Authorization: supabaseAccessToken
-            ? `Bearer ${supabaseAccessToken}`
-            : "",
+      cookies: {
+        async get(name: string) {
+          const cookieStore = await cookieStorePromise;
+          return cookieStore.get(name)?.value;
+        },
+        async set(name: string, value: string, options: CookieOptions) {
+          try {
+            const cookieStore = await cookieStorePromise;
+            cookieStore.set({ name, value, ...options });
+          } catch {
+            // Only allowed in Server Components or Route Handlers
+          }
+        },
+        async remove(name: string, options: CookieOptions) {
+          try {
+            const cookieStore = await cookieStorePromise;
+            cookieStore.set({ name, value: "", ...options });
+          } catch {
+            // Only allowed in Server Components or Route Handlers
+          }
         },
       },
     }
   );
-}
+};
 
 // Helper to get the current user's session on the server
 export async function getServerSession() {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
   try {
     const {
       data: { session },
