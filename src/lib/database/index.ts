@@ -115,18 +115,42 @@ export async function createPaycheckPeriod(
   }
 }
 
-// Envelope System
+// Enhanced type for envelope balances with envelope info
+export interface EnvelopeBalanceWithMeta {
+  id: string;
+  envelope_id: string;
+  period_id: string;
+  allocated_amount: number;
+  spent_amount: number;
+  name: string;
+  sort_order: number | null;
+}
+
+// Updated getEnvelopeBalances to join with envelopes and return name, sort_order
 export async function getEnvelopeBalances(
   periodId: string
-): Promise<EnvelopeBalance[]> {
+): Promise<EnvelopeBalanceWithMeta[]> {
   try {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("period_envelopes")
-      .select("*")
+      .select(
+        "id, envelope_id, period_id, allocated_amount, spent_amount, envelopes(name, sort_order)"
+      )
       .eq("period_id", periodId);
     if (error) throw error;
-    return data ?? [];
+    // Map to flat structure
+    return (
+      data?.map((row: any) => ({
+        id: row.id,
+        envelope_id: row.envelope_id,
+        period_id: row.period_id,
+        allocated_amount: row.allocated_amount,
+        spent_amount: row.spent_amount,
+        name: row.envelopes?.name ?? "",
+        sort_order: row.envelopes?.sort_order ?? null,
+      })) ?? []
+    );
   } catch (error) {
     console.error("getEnvelopeBalances error:", error);
     return [];
