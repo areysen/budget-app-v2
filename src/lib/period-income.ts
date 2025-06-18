@@ -11,8 +11,30 @@ export async function addIncomeToPeriod(
     is_confirmed: boolean;
   }
 ) {
-  // Add income source to period
-  // Update period.total_income
+  // 1. Insert income row
+  const { error: insertError } = await supabase.from("period_income").insert({
+    period_id: periodId,
+    source_name: income.source_name,
+    amount: income.amount,
+    expected_date: income.expected_date,
+    is_confirmed: income.is_confirmed,
+  });
+  if (insertError) throw insertError;
+
+  // 2. Update period's total_income (sum of confirmed incomes)
+  const { data: incomes, error: incomeError } = await supabase
+    .from("period_income")
+    .select("amount")
+    .eq("period_id", periodId)
+    .eq("is_confirmed", true);
+  if (incomeError) throw incomeError;
+  const total = (incomes ?? []).reduce((sum, i) => sum + (i.amount ?? 0), 0);
+  const { error: updateError } = await supabase
+    .from("paycheck_periods")
+    .update({ total_income: total })
+    .eq("id", periodId);
+  if (updateError) throw updateError;
+  return true;
 }
 
 export async function calculateConservativeBudget(
@@ -20,5 +42,12 @@ export async function calculateConservativeBudget(
   periodId: string
 ) {
   // Calculate budget based only on confirmed income
-  // Used for envelope allocation decisions
+  const { data: incomes, error } = await supabase
+    .from("period_income")
+    .select("amount")
+    .eq("period_id", periodId)
+    .eq("is_confirmed", true);
+  if (error) throw error;
+  const total = (incomes ?? []).reduce((sum, i) => sum + (i.amount ?? 0), 0);
+  return total;
 }

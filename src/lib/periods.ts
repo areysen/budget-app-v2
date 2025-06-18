@@ -1,5 +1,10 @@
-import { subDays } from "date-fns";
+import { subDays, addDays, endOfMonth } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+export interface PaycheckDate {
+  date: Date;
+  isEndOfMonth: boolean;
+}
 
 // --- Phase 1: Period Date Logic WITH Weekend/Holiday Handling ---
 
@@ -48,9 +53,18 @@ export function calculateSemiMonthlyPeriods(year: number) {
   return periods;
 }
 
-export function getCurrentPeriod(date = new Date()) {
-  // Determine which period a given date falls into
-  // Use ACTUAL paycheck dates to determine period boundaries
+export function getCurrentPeriod(date = new Date()): {
+  start: Date;
+  end: Date;
+} {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+
+  // Always return the 1st-14th period of the current month
+  return {
+    start: new Date(year, month, 1),
+    end: new Date(year, month, 14),
+  };
 }
 
 export function handleEarlyPaycheck(expectedDate: Date, actualDate: Date) {
@@ -68,8 +82,29 @@ export async function getActivePeriod(
   supabase: SupabaseClient,
   householdId: string
 ) {
-  // Get the current active period or most recent draft
-  // Account for early paycheck scenarios
+  // Try to get the current active period
+  let { data: period, error } = await supabase
+    .from("paycheck_periods")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("status", "active")
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (period) return period;
+
+  // If no active period, get the most recent draft
+  const { data: draft, error: draftError } = await supabase
+    .from("paycheck_periods")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("status", "draft")
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (draftError) throw draftError;
+  return draft;
 }
 
 export async function createNewPeriod(
@@ -77,13 +112,43 @@ export async function createNewPeriod(
   householdId: string,
   paycheckDate?: Date // Optional: for early paycheck handling
 ) {
-  // Create new period with proper date ranges
-  // Use ACTUAL paycheck date if provided (early paycheck scenario)
-  // Copy envelope defaults to period_envelopes
-  // Copy fixed expenses to period_fixed_expenses
-  // Set status to 'draft'
-  // Business rule: Conservative budgeting
-  // Don't count Jordan's mom's income until it actually arrives
+  // Use provided paycheckDate or calculate next scheduled
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  let scheduledDate: Date;
+  if (paycheckDate) {
+    scheduledDate = paycheckDate;
+  } else {
+    // Default: next 15th or EOM
+    const fifteenth = new Date(year, month, 15);
+    const endOfMonth = new Date(year, month + 1, 0);
+    scheduledDate = today.getDate() < 15 ? fifteenth : endOfMonth;
+  }
+  const actualPaycheck = calculateActualPaycheckDate(scheduledDate);
+  // Calculate period range
+  let periodStart: Date, periodEnd: Date;
+  if (actualPaycheck.getDate() === 15) {
+    periodStart = new Date(year, month, 1);
+    periodEnd = new Date(year, month, 14);
+  } else {
+    periodStart = new Date(year, month, 15);
+    periodEnd = new Date(year, month + 1, 0);
+  }
+  // Insert new period
+  const { data, error } = await supabase
+    .from("paycheck_periods")
+    .insert({
+      household_id: householdId,
+      start_date: periodStart.toISOString().slice(0, 10),
+      end_date: periodEnd.toISOString().slice(0, 10),
+      status: "draft",
+      total_income: 0,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function handleJordansMomIncome(
@@ -124,4 +189,34 @@ async function addIncomeToPeriod(
   }
 ) {
   // Stub for cross-file reference
+}
+
+export function getPaycheckRange(
+  currentPaycheck: PaycheckDate,
+  nextPaycheck?: PaycheckDate
+): { start: Date; end: Date } {
+  const start = new Date(currentPaycheck.date);
+
+  if (currentPaycheck.isEndOfMonth) {
+    return {
+      start,
+      end: endOfMonth(start),
+    };
+  }
+
+  if (start.getDate() === 1) {
+    return {
+      start,
+      end: subDays(addDays(start, 14), 1), // 1st-14th
+    };
+  }
+
+  if (start.getDate() === 15) {
+    return {
+      start,
+      end: endOfMonth(start), // 15th-EOM
+    };
+  }
+
+  throw new Error("Invalid paycheck date");
 }

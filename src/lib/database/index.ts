@@ -1,5 +1,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
+import {
+  calculateActualPaycheckDate,
+  getPaycheckRange,
+  getCurrentPeriod,
+} from "@/lib/periods";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Household = Database["public"]["Tables"]["households"]["Row"];
@@ -81,7 +86,12 @@ export async function getCurrentPaycheckPeriod(
       .order("start_date", { ascending: false })
       .limit(1)
       .single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === "PGRST116") {
+        return null;
+      }
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error("getCurrentPaycheckPeriod error:", error);
@@ -91,24 +101,79 @@ export async function getCurrentPaycheckPeriod(
 
 export async function createPaycheckPeriod(
   householdId: string,
-  startDate: Date,
-  endDate: Date,
+  option: "current" | "upcoming",
   expectedIncome: number
 ): Promise<PaycheckPeriod | null> {
   try {
     const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from("paycheck_periods")
-      .insert({
-        household_id: householdId,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        expected_income: expectedIncome,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const today = new Date();
+    const month = today.getMonth();
+    const year = today.getFullYear();
+
+    let startDate: Date, endDate: Date;
+
+    if (option === "current") {
+      // Determine current period based on actual paycheck date
+      const currentPaycheckDate = calculateActualPaycheckDate(
+        new Date(year, month, 15)
+      );
+      const nextPaycheckDate = calculateActualPaycheckDate(
+        new Date(year, month + 1, 0)
+      );
+      startDate = currentPaycheckDate;
+      endDate = new Date(nextPaycheckDate);
+      endDate.setDate(endDate.getDate() - 1); // End day before next paycheck
+
+      // Create current period
+      const { data: currentPeriod, error: currentError } = await supabase
+        .from("paycheck_periods")
+        .insert({
+          household_id: householdId,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          expected_income: expectedIncome,
+        })
+        .select()
+        .single();
+      if (currentError) throw currentError;
+
+      // Auto-create next period
+      const nextStartDate = new Date(nextPaycheckDate);
+      const nextEndDate = new Date(year, month + 1, 14);
+      const { data: nextPeriod, error: nextError } = await supabase
+        .from("paycheck_periods")
+        .insert({
+          household_id: householdId,
+          start_date: nextStartDate.toISOString(),
+          end_date: nextEndDate.toISOString(),
+          expected_income: 0, // Default to 0 for next period
+        })
+        .select()
+        .single();
+      if (nextError) throw nextError;
+
+      return currentPeriod;
+    } else {
+      // Create upcoming period
+      const nextPaycheckDate = calculateActualPaycheckDate(
+        new Date(year, month + 1, 0)
+      );
+      startDate = new Date(nextPaycheckDate);
+      endDate = new Date(year, month + 1, 14);
+
+      const { data, error } = await supabase
+        .from("paycheck_periods")
+        .insert({
+          household_id: householdId,
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          expected_income: expectedIncome,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }
   } catch (error) {
     console.error("createPaycheckPeriod error:", error);
     return null;

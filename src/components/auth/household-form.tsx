@@ -37,33 +37,32 @@ export function HouseholdForm({ onSuccess }: HouseholdFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
-
+    console.log("Form submitted");
+    if (!validateForm()) {
+      console.log("Validation failed");
+      return;
+    }
     setIsLoading(true);
-
     try {
-      // Create household
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      console.log("User:", user);
+      if (!user) {
+        toast.error("You must be logged in to create a household.");
+        setIsLoading(false);
+        return;
+      }
       const { data: household, error: householdError } = await supabase
         .from("households")
         .insert({
           name: formData.name,
-          description: formData.description,
+          created_by: user.id,
         })
         .select()
         .single();
-
+      console.log("Insert result:", household, householdError);
       if (householdError) throw householdError;
-
-      // Add current user as primary member
-      const { error: memberError } = await supabase
-        .from("household_members")
-        .insert({
-          household_id: household.id,
-          role: "primary",
-        });
-
-      if (memberError) throw memberError;
-
       toast.success("Household created successfully!");
       router.push("/dashboard");
       onSuccess?.();

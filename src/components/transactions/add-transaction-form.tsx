@@ -7,7 +7,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { PlusCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { Session } from "@supabase/supabase-js";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,14 +38,11 @@ interface AddTransactionFormProps {
   session?: Session | null;
 }
 
-const supabase = createClient();
-
 export function AddTransactionForm({
   userId,
   householdId,
   session,
 }: AddTransactionFormProps) {
-  console.log("AddTransactionForm props:", { userId, householdId });
   const [envelopes, setEnvelopes] = useState<
     Array<{ id: string; name: string; sort_order: number | null }>
   >([]);
@@ -63,7 +60,6 @@ export function AddTransactionForm({
 
   useEffect(() => {
     async function fetchEnvelopes() {
-      console.log("Fetching envelopes for household:", householdId);
       const { data, error } = await supabase
         .from("envelopes")
         .select("id, name, sort_order")
@@ -72,7 +68,6 @@ export function AddTransactionForm({
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
 
-      console.log("Envelope fetch result:", { data, error });
       if (error) {
         console.error("Error fetching envelopes:", error);
         toast.error("Failed to load envelopes");

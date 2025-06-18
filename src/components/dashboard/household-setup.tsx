@@ -40,10 +40,6 @@ export async function HouseholdSetup() {
             const householdName = formData.get("householdName") as string;
             if (!householdName) return;
 
-            console.log("Inserting household with:", {
-              name: householdName,
-              created_by: user.id,
-            });
             const household = await createUserHousehold(user.id, householdName);
             if (household) {
               redirect("/dashboard");

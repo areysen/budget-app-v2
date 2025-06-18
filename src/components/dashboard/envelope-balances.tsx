@@ -69,9 +69,10 @@ export async function EnvelopeBalances() {
           <CardTitle>No Active Period</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            There is no active paycheck period.
-          </p>
+          <div className="text-center py-8 text-muted-foreground">
+            There is no active paycheck period. Please create a period to begin
+            budgeting.
+          </div>
         </CardContent>
       </Card>
     );
