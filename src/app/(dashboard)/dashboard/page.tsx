@@ -9,23 +9,32 @@ import { getActivePeriod, createNewPeriod } from "@/lib/periods";
 import { calculateConservativeBudget } from "@/lib/period-income";
 
 export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createServerSupabaseClient();
+
+  // Get user's household
   const {
     data: { user },
-    error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
-  const { data: household, error: householdError } = await supabase
-    .from("household_members")
-    .select("household_id")
-    .eq("user_id", user.id)
+  const { data: household } = await supabase
+    .from("households")
+    .select("id, budget_setup_complete")
     .single();
 
-  if (!household?.household_id) redirect("/onboarding");
+  if (!household) {
+    redirect("/onboarding");
+  }
 
-  const householdId = household.household_id;
+  // Check if budget setup is complete
+  if (!household.budget_setup_complete) {
+    redirect("/budget-setup");
+  }
+
+  const householdId = household.id;
 
   // Fetch the session to pass to the client
   const {
