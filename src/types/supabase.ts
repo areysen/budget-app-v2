@@ -202,44 +202,56 @@ export type Database = {
       }
       fixed_expenses: {
         Row: {
+          anchor_date: string | null
           category: string | null
           created_at: string | null
           due_day: number | null
           estimated_amount: number
           frequency: string
+          frequency_config: Json | null
+          frequency_type: string | null
           household_id: string | null
           id: string
           is_active: boolean | null
           is_variable: boolean | null
           name: string
+          next_due_date: string | null
           notes: string | null
           updated_at: string | null
         }
         Insert: {
+          anchor_date?: string | null
           category?: string | null
           created_at?: string | null
           due_day?: number | null
           estimated_amount: number
           frequency: string
+          frequency_config?: Json | null
+          frequency_type?: string | null
           household_id?: string | null
           id?: string
           is_active?: boolean | null
           is_variable?: boolean | null
           name: string
+          next_due_date?: string | null
           notes?: string | null
           updated_at?: string | null
         }
         Update: {
+          anchor_date?: string | null
           category?: string | null
           created_at?: string | null
           due_day?: number | null
           estimated_amount?: number
           frequency?: string
+          frequency_config?: Json | null
+          frequency_type?: string | null
           household_id?: string | null
           id?: string
           is_active?: boolean | null
           is_variable?: boolean | null
           name?: string
+          next_due_date?: string | null
           notes?: string | null
           updated_at?: string | null
         }
@@ -339,40 +351,52 @@ export type Database = {
       income_sources: {
         Row: {
           amount: number
+          anchor_date: string | null
           bi_weekly_day: string | null
           bi_weekly_start_date: string | null
           created_at: string | null
+          frequency_config: Json | null
+          frequency_type: string | null
           household_id: string
           id: string
           is_active: boolean | null
           monthly_day: number | null
           name: string
+          next_payment_date: string | null
           schedule_type: string
           updated_at: string | null
         }
         Insert: {
           amount: number
+          anchor_date?: string | null
           bi_weekly_day?: string | null
           bi_weekly_start_date?: string | null
           created_at?: string | null
+          frequency_config?: Json | null
+          frequency_type?: string | null
           household_id: string
           id?: string
           is_active?: boolean | null
           monthly_day?: number | null
           name: string
+          next_payment_date?: string | null
           schedule_type: string
           updated_at?: string | null
         }
         Update: {
           amount?: number
+          anchor_date?: string | null
           bi_weekly_day?: string | null
           bi_weekly_start_date?: string | null
           created_at?: string | null
+          frequency_config?: Json | null
+          frequency_type?: string | null
           household_id?: string
           id?: string
           is_active?: boolean | null
           monthly_day?: number | null
           name?: string
+          next_payment_date?: string | null
           schedule_type?: string
           updated_at?: string | null
         }
