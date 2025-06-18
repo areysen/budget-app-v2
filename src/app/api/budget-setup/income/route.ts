@@ -7,44 +7,43 @@ const incomeSourceSchema = z.object({
   primaryIncome: z.object({
     name: z.string().min(1),
     amount: z.number().min(0),
-    scheduleType: z.enum(["semi_monthly", "bi_weekly", "monthly", "one_time"]),
-    biWeeklyDay: z
+    frequency_type: z
       .enum([
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
+        "monthly",
+        "biweekly",
+        "weekly",
+        "semi_monthly",
+        "quarterly",
+        "yearly",
+        "per_paycheck",
       ])
+      .nullable()
       .optional(),
-    biWeeklyStartDate: z.string().optional(),
-    monthlyDay: z.number().optional(),
+    frequency_config: z.any().nullable().optional(),
+    anchor_date: z.string().nullable().optional(),
+    next_due_date: z.string().nullable().optional(),
+    next_payment_date: z.string().nullable().optional(),
   }),
   secondaryIncomes: z.array(
     z.object({
       name: z.string().min(1),
       amount: z.number().min(0),
-      scheduleType: z.enum([
-        "semi_monthly",
-        "bi_weekly",
-        "monthly",
-        "one_time",
-      ]),
-      biWeeklyDay: z
+      frequency_type: z
         .enum([
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday",
+          "monthly",
+          "biweekly",
+          "weekly",
+          "semi_monthly",
+          "quarterly",
+          "yearly",
+          "per_paycheck",
         ])
+        .nullable()
         .optional(),
-      biWeeklyStartDate: z.string().optional(),
-      monthlyDay: z.number().optional(),
+      frequency_config: z.any().nullable().optional(),
+      anchor_date: z.string().nullable().optional(),
+      next_due_date: z.string().nullable().optional(),
+      next_payment_date: z.string().nullable().optional(),
     })
   ),
 });
@@ -63,10 +62,10 @@ export async function POST(request: Request) {
       household_id: data.householdId,
       name: income.name,
       amount: income.amount,
-      schedule_type: income.scheduleType,
-      bi_weekly_day: income.biWeeklyDay || null,
-      bi_weekly_start_date: income.biWeeklyStartDate || null,
-      monthly_day: income.monthlyDay || null,
+      frequency_type: income.frequency_type,
+      frequency_config: income.frequency_config,
+      anchor_date: income.anchor_date,
+      next_payment_date: income.next_payment_date,
       is_active: true,
     }));
 

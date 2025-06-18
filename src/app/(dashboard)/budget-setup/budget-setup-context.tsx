@@ -5,22 +5,16 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
+import { FrequencyType, FrequencyConfig } from "@/types/frequency";
 
 // --- Step Data Types ---
 export interface IncomeSource {
   name: string;
   amount: number;
-  scheduleType: "semi_monthly" | "bi_weekly" | "monthly" | "one_time";
-  biWeeklyDay?:
-    | "monday"
-    | "tuesday"
-    | "wednesday"
-    | "thursday"
-    | "friday"
-    | "saturday"
-    | "sunday";
-  biWeeklyStartDate?: string; // ISO date string
-  monthlyDay?: number; // 1-31 or -1 for last day
+  frequency_type: FrequencyType | null;
+  frequency_config: FrequencyConfig | null;
+  anchor_date: string | null;
+  next_payment_date: string | null;
 }
 
 export interface IncomeStepData {
@@ -38,9 +32,18 @@ export interface FixedExpense {
   name: string;
   category: string;
   amount: number;
-  dueDay: number;
   isVariable: boolean;
-  frequency: "monthly" | "quarterly" | "annual";
+  notes?: string;
+
+  // Enhanced frequency fields
+  frequency_type: FrequencyType | null;
+  frequency_config: FrequencyConfig | null;
+  anchor_date: string | null;
+  next_due_date: string | null;
+
+  // Backward compatibility
+  dueDay?: number;
+  frequency?: "monthly" | "quarterly" | "annual";
 }
 export interface BudgetFixedExpensesStep {
   expenses: FixedExpense[];

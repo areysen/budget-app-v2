@@ -8,10 +8,30 @@ const fixedExpenseSchema = z.object({
     z.object({
       name: z.string().min(1),
       amount: z.number().min(0),
-      dueDay: z.number().min(1).max(31),
-      frequency: z.enum(["monthly", "bi-weekly"]),
       isVariable: z.boolean(),
       category: z.string().min(1),
+      notes: z.string().optional(),
+
+      // Enhanced frequency fields
+      frequency_type: z
+        .enum([
+          "monthly",
+          "biweekly",
+          "weekly",
+          "semi_monthly",
+          "quarterly",
+          "yearly",
+          "per_paycheck",
+        ])
+        .nullable()
+        .optional(),
+      frequency_config: z.any().nullable().optional(), // JSON config object
+      anchor_date: z.string().nullable().optional(),
+      next_due_date: z.string().nullable().optional(),
+
+      // Backward compatibility
+      dueDay: z.number().min(1).max(31).optional(),
+      frequency: z.enum(["monthly", "quarterly", "annual"]).optional(),
     })
   ),
 });
@@ -50,10 +70,16 @@ export async function POST(request: Request) {
           household_id: data.householdId,
           name: expense.name,
           estimated_amount: expense.amount,
-          due_day: expense.dueDay,
-          frequency: expense.frequency,
           is_variable: expense.isVariable,
           category: expense.category,
+          notes: expense.notes,
+
+          // Enhanced frequency system
+          frequency_type: expense.frequency_type,
+          frequency_config: expense.frequency_config,
+          anchor_date: expense.anchor_date,
+          next_due_date: expense.next_due_date,
+
           is_active: true,
         }))
       );
