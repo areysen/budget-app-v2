@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { Tables } from "@/types/supabase";
 import { IncomeSourceSummaryCard } from "./income-source-summary-card";
 import { IncomeSourceForm } from "./income-source-form";
+import { useUser } from "@/hooks/use-user";
 import {
   FrequencyType,
   FrequencyConfig,
@@ -65,6 +66,7 @@ interface StepIncomeProps {
 const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
   function StepIncome({ householdId, onComplete }, ref) {
     const { getStepData, setStepData } = useBudgetSetup();
+    const { loading: userLoading, error: userError } = useUser();
     const [state, setState] = useState<IncomeFormState>(() => {
       const existingData = getStepData("income");
       return {
@@ -172,6 +174,80 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
       },
     }));
 
+    const handleDeleteIncome = async (incomeId: string) => {
+      try {
+        const response = await fetch(
+          `/api/budget-setup/income-sources?id=${incomeId}&householdId=${householdId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to delete income source");
+        }
+
+        // Update state based on whether it was primary or secondary income
+        if (state.primaryIncome?.id === incomeId) {
+          setState((prev) => ({
+            ...prev,
+            primaryIncome: null,
+            editingPrimary: true,
+          }));
+          updateStepData(null, state.secondaryIncomes);
+        } else {
+          const updatedSecondaryIncomes = state.secondaryIncomes.filter(
+            (income) => income.id !== incomeId
+          );
+          setState((prev) => ({
+            ...prev,
+            secondaryIncomes: updatedSecondaryIncomes,
+          }));
+          updateStepData(state.primaryIncome, updatedSecondaryIncomes);
+        }
+
+        toast.success("Income source deleted successfully");
+      } catch (error) {
+        console.error("Error deleting income source:", error);
+        toast.error("Failed to delete income source");
+      }
+    };
+
+    // Show loading state while checking authentication
+    if (userLoading) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading...</span>
+        </div>
+      );
+    }
+
+    // Show error state if authentication failed
+    if (userError) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-red-500">
+          <p>Authentication error: {userError}</p>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => (window.location.href = "/auth/signin")}
+          >
+            Sign In
+          </Button>
+        </div>
+      );
+    }
+
+    // Show error if no household ID
+    if (!householdId) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 text-red-500">
+          <p>No household found. Please create or join a household first.</p>
+        </div>
+      );
+    }
+
     if (state.loading) {
       return (
         <div className="space-y-6">
@@ -210,17 +286,19 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     ? {
                         ...data,
                         id: state.primaryIncome.id,
-                        is_primary: true,
                         household_id: householdId,
+                        is_primary: true,
                       }
                     : {
                         ...data,
+                        household_id: householdId,
                         is_primary: true,
-                        householdId: householdId,
                       };
 
                   const response = await fetch(
-                    "/api/budget-setup/income-sources",
+                    `/api/budget-setup/income-sources?householdId=${householdId}${
+                      state.primaryIncome ? `&id=${state.primaryIncome.id}` : ""
+                    }`,
                     {
                       method,
                       headers: {
@@ -234,11 +312,11 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     throw new Error("Failed to save income source");
                   }
 
-                  const { incomeSource } = await response.json();
+                  const savedIncome = await response.json();
                   const convertedIncome =
-                    convertDbIncomeToFrontend(incomeSource);
+                    convertDbIncomeToFrontend(savedIncome);
 
-                  setState((prev: IncomeFormState) => ({
+                  setState((prev) => ({
                     ...prev,
                     primaryIncome: convertedIncome,
                     editingPrimary: false,
@@ -246,48 +324,46 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                   }));
 
                   updateStepData(convertedIncome, state.secondaryIncomes);
-                  toast.success("Primary income saved successfully!");
+                  toast.success("Income source saved successfully");
                 } catch (error) {
                   console.error("Error saving income source:", error);
-                  toast.error(
-                    "Failed to save income source. Please try again."
-                  );
-                  setState((prev: IncomeFormState) => ({
-                    ...prev,
-                    saving: false,
-                  }));
+                  toast.error("Failed to save income source");
+                  setState((prev) => ({ ...prev, saving: false }));
                 }
               }}
-              onCancel={() =>
-                setState((prev: IncomeFormState) => ({
+              onCancel={() => {
+                setState((prev) => ({
                   ...prev,
                   editingPrimary: false,
-                }))
-              }
-            />
-          ) : state.primaryIncome ? (
-            <IncomeSourceSummaryCard
-              income={state.primaryIncome}
-              onEdit={() =>
-                setState((prev: IncomeFormState) => ({
-                  ...prev,
-                  editingPrimary: true,
-                }))
-              }
+                }));
+              }}
             />
           ) : (
-            <Card className="p-6">
-              <Button
-                onClick={() =>
-                  setState((prev: IncomeFormState) => ({
-                    ...prev,
-                    editingPrimary: true,
-                  }))
-                }
-              >
-                Add Primary Income
-              </Button>
-            </Card>
+            <>
+              {state.primaryIncome ? (
+                <IncomeSourceSummaryCard
+                  income={state.primaryIncome}
+                  onEdit={() =>
+                    setState((prev) => ({ ...prev, editingPrimary: true }))
+                  }
+                  onDelete={() =>
+                    state.primaryIncome &&
+                    handleDeleteIncome(state.primaryIncome.id)
+                  }
+                />
+              ) : (
+                <Card className="p-6">
+                  <Button
+                    onClick={() =>
+                      setState((prev) => ({ ...prev, editingPrimary: true }))
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Primary Income
+                  </Button>
+                </Card>
+              )}
+            </>
           )}
         </div>
 
@@ -458,58 +534,14 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     <IncomeSourceSummaryCard
                       key={income.id}
                       income={income}
-                      onEdit={() =>
-                        setState((prev: IncomeFormState) => ({
+                      onEdit={() => {
+                        setState((prev) => ({
                           ...prev,
                           editingSecondary: income.id,
-                        }))
-                      }
-                      onDelete={async () => {
-                        try {
-                          setState((prev: IncomeFormState) => ({
-                            ...prev,
-                            saving: true,
-                          }));
-
-                          const response = await fetch(
-                            `/api/budget-setup/income-sources?id=${income.id}`,
-                            {
-                              method: "DELETE",
-                            }
-                          );
-
-                          if (!response.ok) {
-                            throw new Error("Failed to delete income source");
-                          }
-
-                          setState((prev: IncomeFormState) => ({
-                            ...prev,
-                            secondaryIncomes: prev.secondaryIncomes.filter(
-                              (i) => i.id !== income.id
-                            ),
-                            saving: false,
-                          }));
-
-                          updateStepData(
-                            state.primaryIncome,
-                            state.secondaryIncomes.filter(
-                              (i) => i.id !== income.id
-                            )
-                          );
-                          toast.success(
-                            "Secondary income deleted successfully!"
-                          );
-                        } catch (error) {
-                          console.error("Error deleting income source:", error);
-                          toast.error(
-                            "Failed to delete income source. Please try again."
-                          );
-                          setState((prev: IncomeFormState) => ({
-                            ...prev,
-                            saving: false,
-                          }));
-                        }
+                          addingNewSecondary: false,
+                        }));
                       }}
+                      onDelete={() => handleDeleteIncome(income.id)}
                     />
                   ))}
                 </div>

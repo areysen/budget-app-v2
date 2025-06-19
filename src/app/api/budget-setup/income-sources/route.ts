@@ -192,26 +192,48 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Delete income source (soft delete)
+// DELETE - Delete income source (hard delete during setup)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const householdId = searchParams.get("householdId");
 
-    if (!id) {
+    if (!id || !householdId) {
       return NextResponse.json(
-        { error: "Income source ID is required" },
+        { error: "Income source ID and household ID are required" },
         { status: 400 }
       );
     }
 
     const supabase = await createServerSupabaseClient();
 
+    // Verify user has access to this household
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: member } = await supabase
+      .from("household_members")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!member) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Check if this is a primary income source
     const { data: incomeSource } = await supabase
       .from("income_sources")
       .select("is_primary")
       .eq("id", id)
+      .eq("household_id", householdId)
       .single();
 
     if (incomeSource?.is_primary) {
@@ -221,11 +243,12 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Soft delete by setting is_active to false
+    // Hard delete the income source
     const { error } = await supabase
       .from("income_sources")
-      .update({ is_active: false })
-      .eq("id", id);
+      .delete()
+      .eq("id", id)
+      .eq("household_id", householdId);
 
     if (error) throw error;
 

@@ -1,0 +1,185 @@
+# Budget App v2 - Product Requirements Document
+
+## Overview
+
+Budget App v2 is a modern, paycheck-period focused zero-based budgeting application designed for household sharing. The app emphasizes a friendly, approachable interface to reduce financial anxiety while providing powerful budgeting tools through the envelope method.
+
+## Core Features
+
+### Authentication & Household Management
+- Supabase authentication with email/password
+- Household creation and member management
+- Primary and secondary user roles with appropriate permissions
+- Protected routes and secure data access
+
+### Paycheck Period Management
+- Semi-monthly budget cycles (1st-14th and 15th-EOM)
+- Support for bi-weekly income sources
+- Automatic period creation with manual approval
+- Period status tracking and management
+- Conservative budgeting approach (secondary income not counted until received)
+
+### Income Management
+- Multiple income source support
+- Primary and secondary income tracking
+- Frequency-based income calculations
+- Income source categorization
+- Period-specific income adjustments
+
+### Envelope System
+- Customizable spending categories
+- Configurable rollover rules (save, rollover, rollover_limit)
+- Envelope-to-envelope transfers
+- Overspending handling with transfer suggestions
+- Balance tracking (allocated vs. spent)
+- Visual progress indicators
+
+### Fixed Expenses
+- Recurring bill management
+- Support for variable amounts
+- Due date tracking and notifications
+- Automatic period allocation
+- Payment status tracking
+- Bill categorization
+
+### Savings Goals
+- Long-term savings target management
+- Emergency fund prioritization ($1000 minimum)
+- Multiple contribution types (planned, overflow, roundup)
+- Progress tracking and visualization
+- Goal-specific strategies
+
+### Transaction Management
+- Plaid integration for bank transaction imports
+- Manual transaction entry
+- AI-powered categorization suggestions
+- Required envelope assignment
+- Transaction approval workflow
+- Roundup calculations for savings
+
+### AI-Powered Insights
+- Smart budget recommendations
+- Spending pattern analysis
+- Emergency fund strategies
+- Envelope transfer suggestions
+- Goal achievement coaching
+- Context-aware financial advice
+
+## Technical Requirements
+
+### Frontend
+- Next.js 15 with App Router
+- TypeScript with strict typing
+- Tailwind CSS for styling
+- shadcn/ui component library
+- Mobile-first responsive design
+- Proper loading states and error boundaries
+- Optimistic updates for better UX
+
+### Backend
+- Supabase database with Row Level Security
+- Proper household-scoped data access
+- Real-time subscription support where needed
+- Secure API routes with proper validation
+- Efficient data caching strategies
+
+### Integration
+- Plaid for bank transaction imports
+- AI services for recommendations
+- Email notifications system
+- Real-time updates for shared households
+
+### Security
+- Row Level Security for all database tables
+- Proper authentication checks
+- Input validation and sanitization
+- Secure credential management
+- Protected API endpoints
+
+## User Experience
+
+### Design System
+- Friendly, approachable interface
+- Consistent color scheme and typography
+- Clear visual hierarchy
+- Proper contrast and accessibility
+- Mobile-optimized touch targets
+- Intuitive navigation patterns
+
+### Responsive Design
+- Mobile-first approach
+- Tablet and desktop optimizations
+- Touch-friendly interface elements
+- Consistent experience across devices
+
+### Accessibility
+- WCAG 2.1 compliance
+- Screen reader support
+- Keyboard navigation
+- Proper color contrast
+- Reduced motion support
+
+## Data Model
+
+### Core Tables
+- profiles (user accounts)
+- households (budget groups)
+- household_members (permissions)
+- paycheck_periods (budget cycles)
+- period_income (income tracking)
+- envelopes (categories)
+- period_envelopes (allocations)
+- fixed_expenses (bills)
+- period_fixed_expenses (bill instances)
+- savings_goals (targets)
+- savings_contributions (goal progress)
+- plaid_transactions (imports)
+- user_transactions (verified)
+- ai_recommendations (insights)
+- spending_insights (analysis)
+
+## Implementation Phases
+
+### Phase 1: Core Infrastructure
+1. Project setup with Next.js and Supabase
+2. Authentication system implementation
+3. Household management
+4. Basic database structure
+5. Protected routes and API endpoints
+
+### Phase 2: Budget Foundation
+1. Paycheck period management
+2. Income source tracking
+3. Envelope system basics
+4. Fixed expense management
+5. Basic transaction entry
+
+### Phase 3: Advanced Features
+1. Plaid integration
+2. Savings goals system
+3. AI recommendations
+4. Transaction categorization
+5. Real-time updates
+
+### Phase 4: Enhancement & Polish
+1. Mobile optimizations
+2. Performance improvements
+3. Advanced insights
+4. UI/UX refinements
+5. Additional customization options
+
+## Success Metrics
+- User engagement with budgeting features
+- Successful transaction categorization rate
+- Household collaboration effectiveness
+- AI recommendation accuracy
+- App performance metrics
+- User satisfaction scores
+
+## Future Considerations
+- Dark mode support
+- Additional banking integrations
+- Advanced reporting features
+- Budget templating system
+- Mobile app versions
+- International currency support 

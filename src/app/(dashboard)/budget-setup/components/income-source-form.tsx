@@ -773,19 +773,18 @@ export function IncomeSourceForm({
           </div>
         )}
 
-        <div className="flex items-center gap-3 pt-4">
-          <Button type="submit" disabled={isLoading} className="flex-1">
-            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {submitLabel}
-          </Button>
+        <div className="flex justify-end gap-3">
           <Button
             type="button"
             variant="outline"
             onClick={onCancel}
             disabled={isLoading}
-            className="flex-1"
           >
             {cancelLabel}
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {submitLabel}
           </Button>
         </div>
       </form>
