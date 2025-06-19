@@ -1,11 +1,19 @@
+// src/hooks/use-user.ts
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Database } from "@/types/supabase";
 
 type HouseholdMember = Database["public"]["Tables"]["household_members"]["Row"];
 
-export function useUser() {
+interface UseUserReturn {
+  user: User | null;
+  householdId: string | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export function useUser(): UseUserReturn {
   const [user, setUser] = useState<User | null>(null);
   const [householdId, setHouseholdId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,49 +24,48 @@ export function useUser() {
 
     const fetchHouseholdId = async (userId: string) => {
       try {
-        const { data, error: householdError } = await supabase
+        const supabase = createClient();
+        const { data, error } = await supabase
           .from("household_members")
           .select("household_id")
           .eq("user_id", userId)
           .single();
 
-        if (householdError) {
-          console.error("Error fetching household:", householdError);
+        if (error) {
+          console.warn("No household found for user:", error.message);
           if (isMounted) {
-            setError(householdError.message);
-            setLoading(false);
+            setHouseholdId(null);
           }
           return;
         }
 
-        if (isMounted) {
-          setHouseholdId(data?.household_id || null);
-          setError(null);
-          setLoading(false);
+        if (data?.household_id && isMounted) {
+          setHouseholdId(data.household_id);
         }
       } catch (err) {
-        console.error("Error in fetchHouseholdId:", err);
+        console.error("Error fetching household:", err);
         if (isMounted) {
-          setError(
-            err instanceof Error ? err.message : "An unexpected error occurred"
-          );
-          setLoading(false);
+          setHouseholdId(null);
         }
       }
     };
 
-    // Get initial user
     const initializeUser = async () => {
       try {
+        const supabase = createClient();
+
+        // Get initial user session
         const {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
 
         if (userError) {
-          console.error("Error fetching user:", userError);
+          console.error("Error getting user:", userError);
           if (isMounted) {
-            setError(userError.message);
+            setError("Failed to get user session");
+            setUser(null);
+            setHouseholdId(null);
             setLoading(false);
           }
           return;
@@ -66,14 +73,18 @@ export function useUser() {
 
         if (isMounted) {
           setUser(user);
-          if (user) {
-            await fetchHouseholdId(user.id);
-          } else {
-            setLoading(false);
-          }
+        }
+
+        if (user) {
+          await fetchHouseholdId(user.id);
+        }
+
+        if (isMounted) {
+          setError(null);
+          setLoading(false);
         }
       } catch (err) {
-        console.error("Error in initializeUser:", err);
+        console.error("Unexpected error in initializeUser:", err);
         if (isMounted) {
           setError(
             err instanceof Error ? err.message : "An unexpected error occurred"
@@ -86,6 +97,7 @@ export function useUser() {
     initializeUser();
 
     // Listen for auth changes
+    const supabase = createClient();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event: string, session) => {
@@ -95,8 +107,9 @@ export function useUser() {
           await fetchHouseholdId(session.user.id);
         } else {
           setHouseholdId(null);
-          setLoading(false);
         }
+        setLoading(false);
+        setError(null);
       }
     });
 
@@ -108,7 +121,13 @@ export function useUser() {
 
   // Debug logging
   useEffect(() => {
-    console.log("useUser state:", { user, householdId, loading, error });
+    console.log("useUser state:", {
+      user: !!user,
+      householdId,
+      loading,
+      error,
+      userId: user?.id,
+    });
   }, [user, householdId, loading, error]);
 
   return { user, householdId, loading, error };

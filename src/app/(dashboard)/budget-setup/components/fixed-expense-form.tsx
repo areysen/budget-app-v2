@@ -534,8 +534,11 @@ export function FixedExpenseForm({
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
                   <CategorySelector
-                    value={form.getValues("category")}
-                    onChange={(value) => form.setValue("category", value)}
+                    value={form.watch("category")}
+                    onChange={(value) => {
+                      form.setValue("category", value); // ← Set the value first
+                      form.trigger("category"); // ← Then trigger validation
+                    }}
                     availableCategories={availableCategories}
                     loading={loadingCategories}
                     error={form.formState.errors.category?.message}

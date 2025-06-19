@@ -1,3 +1,4 @@
+// src/app/(dashboard)/budget-setup/components/step-fixed-expenses.tsx
 "use client";
 
 import React, {
@@ -6,6 +7,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,18 +40,28 @@ interface StepFixedExpensesProps {
   onComplete: () => void;
 }
 
-const mapToFixedExpense = (dbExpense: FixedExpenseType): FixedExpense => ({
-  id: dbExpense.id,
-  name: dbExpense.name || "",
-  category: dbExpense.category || "",
-  amount: dbExpense.estimated_amount,
-  isVariable: dbExpense.is_variable || false,
-  notes: dbExpense.notes || undefined,
-  frequency_type: dbExpense.frequency_type as FrequencyType | null,
-  frequency_config: jsonToFrequencyConfig(dbExpense.frequency_config),
-  anchor_date: dbExpense.anchor_date,
-  next_due_date: dbExpense.next_due_date,
-});
+const mapToFixedExpense = (dbExpense: FixedExpenseType): FixedExpense => {
+  // This function can receive objects from the database (FixedExpenseType)
+  // or from the application's context (FixedExpense). We cast to `any`
+  // to handle both shapes gracefully and avoid type errors.
+  const expense = dbExpense as any;
+
+  const amount = expense.estimated_amount ?? expense.amount ?? 0;
+  const isVariable = expense.is_variable ?? expense.isVariable ?? false;
+
+  return {
+    id: expense.id,
+    name: expense.name || "",
+    category: expense.category || "",
+    amount: Number(amount) || 0,
+    isVariable: isVariable,
+    notes: expense.notes || undefined,
+    frequency_type: expense.frequency_type as FrequencyType | null,
+    frequency_config: jsonToFrequencyConfig(expense.frequency_config),
+    anchor_date: expense.anchor_date,
+    next_due_date: expense.next_due_date,
+  };
+};
 
 const StepFixedExpenses = forwardRef(function StepFixedExpenses(
   { householdId, onComplete }: StepFixedExpensesProps,
@@ -61,6 +73,8 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
     loading: userLoading,
     error: userError,
   } = useUser();
+
+  // Initialize state with data from context
   const [state, setState] = useState<FixedExpenseFormState>(() => {
     const existingData = getStepData("fixedExpenses");
     return {
@@ -71,6 +85,91 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       saving: false,
     };
   });
+  const hasAttemptedLoad = useRef(false);
+  // IMPORTANT: All hooks must be called before any early returns!
+  // Memoize the update function to prevent unnecessary re-renders
+  const updateStepData = useCallback(
+    (expenses: FixedExpenseType[]) => {
+      setStepData("fixedExpenses", {
+        expenses: expenses.map(mapToFixedExpense),
+      });
+    },
+    [setStepData]
+  );
+
+  // Load existing data if not in state
+  useEffect(() => {
+    const loadFixedExpenses = async () => {
+      // Exit early if we don't have household ID or already attempted load
+      if (!userHouseholdId || hasAttemptedLoad.current) {
+        return;
+      }
+
+      // Check if we already have data in state
+      if (state.expenses.length > 0) {
+        hasAttemptedLoad.current = true;
+        return;
+      }
+
+      // Check context for data first
+      const existingData = getStepData("fixedExpenses");
+      if (existingData?.expenses && existingData.expenses.length > 0) {
+        setState((prev) => ({
+          ...prev,
+          expenses: existingData.expenses,
+          addingNewExpense: false,
+        }));
+        hasAttemptedLoad.current = true;
+        return;
+      }
+
+      try {
+        hasAttemptedLoad.current = true;
+        setState((prev) => ({ ...prev, loading: true }));
+
+        const response = await fetch(
+          `/api/budget-setup/fixed-expenses?householdId=${userHouseholdId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load fixed expenses");
+        }
+
+        const { expenses } = await response.json();
+
+        // Update both state and context
+        setState((prev) => ({
+          ...prev,
+          expenses: expenses || [],
+          loading: false,
+          addingNewExpense: !expenses?.length,
+        }));
+
+        // Only update context if we have new data
+        if (expenses && expenses.length > 0) {
+          updateStepData(expenses);
+        }
+      } catch (error) {
+        console.error("Error loading fixed expenses:", error);
+        toast.error("Failed to load fixed expenses");
+        setState((prev) => ({ ...prev, loading: false }));
+      }
+    };
+
+    loadFixedExpenses();
+  }, [userHouseholdId, updateStepData, getStepData]); // Clean dependency array
+
+  useImperativeHandle(ref, () => ({
+    submit: async () => {
+      if (state.expenses.length === 0) {
+        toast.error("Please add at least one fixed expense before continuing");
+        return;
+      }
+      onComplete();
+    },
+  }));
+
+  // NOW we can have early returns - all hooks have been called above
 
   // Show loading state while checking authentication
   if (userLoading) {
@@ -105,78 +204,6 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       </div>
     );
   }
-
-  // Memoize the update function to prevent unnecessary re-renders
-  const updateStepData = useCallback(
-    (expenses: FixedExpenseType[]) => {
-      setStepData("fixedExpenses", {
-        expenses: expenses.map(mapToFixedExpense),
-      });
-    },
-    [setStepData]
-  );
-
-  // Load existing data if not in state
-  useEffect(() => {
-    const loadFixedExpenses = async () => {
-      if (state.loading || state.expenses.length > 0) {
-        return;
-      }
-
-      // Check context for data
-      const existingData = getStepData("fixedExpenses");
-      if (existingData?.expenses && existingData.expenses.length > 0) {
-        setState((prev) => ({
-          ...prev,
-          expenses: existingData.expenses,
-          addingNewExpense: false,
-        }));
-        return;
-      }
-
-      try {
-        setState((prev) => ({ ...prev, loading: true }));
-        const response = await fetch(
-          `/api/budget-setup/fixed-expenses?householdId=${userHouseholdId}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to load fixed expenses");
-        }
-
-        const { expenses } = await response.json();
-
-        // Update both state and context
-        setState((prev) => ({
-          ...prev,
-          expenses: expenses || [],
-          loading: false,
-          addingNewExpense: !expenses?.length,
-        }));
-
-        // Only update context if we have new data
-        if (expenses && expenses.length > 0) {
-          updateStepData(expenses);
-        }
-      } catch (error) {
-        console.error("Error loading fixed expenses:", error);
-        toast.error("Failed to load fixed expenses");
-        setState((prev) => ({ ...prev, loading: false }));
-      }
-    };
-
-    loadFixedExpenses();
-  }, [userHouseholdId, updateStepData]);
-
-  useImperativeHandle(ref, () => ({
-    submit: async () => {
-      if (state.expenses.length === 0) {
-        toast.error("Please add at least one fixed expense before continuing");
-        return;
-      }
-      onComplete();
-    },
-  }));
 
   const handleAddExpense = () => {
     setState((prev) => ({
@@ -226,17 +253,27 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
     try {
       setState((prev) => ({ ...prev, saving: true }));
 
-      const payload = {
-        ...formData,
-        household_id: userHouseholdId,
-        estimated_amount: formData.amount,
-        is_variable: formData.isVariable,
-        frequency_config: frequencyConfigToJson(formData.frequency_config),
+      // Prepare the expense data
+      const expenseData = {
+        name: formData.name,
+        category: formData.category,
+        amount: formData.amount,
+        isVariable: formData.isVariable,
+        notes: formData.notes,
+        frequency_type: formData.frequency_type,
+        frequency_config: formData.frequency_config,
+        anchor_date: formData.anchor_date,
+        next_due_date: formData.next_due_date,
       };
 
       let response;
       if (state.editingExpense) {
-        // Update existing expense
+        // Update existing expense - API expects householdId + expenses array
+        const payload = {
+          householdId: userHouseholdId,
+          expenses: [{ ...expenseData, id: state.editingExpense }], // Include ID for update
+        };
+
         response = await fetch(
           `/api/budget-setup/fixed-expenses?householdId=${userHouseholdId}&id=${state.editingExpense}`,
           {
@@ -246,19 +283,22 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
           }
         );
       } else {
-        // Create new expense
-        response = await fetch(
-          `/api/budget-setup/fixed-expenses?householdId=${userHouseholdId}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
+        // Create new expense - API expects householdId + expenses array
+        const payload = {
+          householdId: userHouseholdId,
+          expenses: [expenseData], // Wrap single expense in array
+        };
+
+        response = await fetch(`/api/budget-setup/fixed-expenses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
 
       if (!response.ok) {
-        throw new Error("Failed to save expense");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save expense");
       }
 
       const savedExpense = await response.json();
@@ -284,7 +324,6 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       );
     } catch (error) {
       console.error("Error saving expense:", error);
-      toast.error("Failed to save expense");
       setState((prev) => ({ ...prev, saving: false }));
     }
   };

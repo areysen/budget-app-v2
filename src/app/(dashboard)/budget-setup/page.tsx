@@ -1,7 +1,9 @@
+// src/app/(dashboard)/budget-setup/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/hooks/use-user";
 import { BudgetSetupProvider } from "./budget-setup-context";
 import { StepIncome } from "./components/step-income";
 import { StepFixedExpenses } from "./components/step-fixed-expenses";
@@ -22,10 +24,9 @@ const STEPS = [
 
 export default function BudgetSetupPage() {
   const router = useRouter();
+  const { user, householdId, loading, error } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [householdId, setHouseholdId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const stepRef = useRef<{ submit: () => void }>(null);
   const [completedSteps, setCompletedSteps] = useState<boolean[]>([
     false,
@@ -34,20 +35,93 @@ export default function BudgetSetupPage() {
     false,
   ]);
 
+  // Add debugging
   useEffect(() => {
-    async function fetchHouseholdId() {
-      setLoading(true);
-      const res = await fetch("/api/user/household");
-      if (res.ok) {
-        const data = await res.json();
-        setHouseholdId(data.householdId);
-      } else {
-        setHouseholdId(null);
-      }
-      setLoading(false);
-    }
-    fetchHouseholdId();
-  }, []);
+    console.log("🔍 Budget Setup Debug:", {
+      user: user ? "Present" : "Missing",
+      userId: user?.id,
+      householdId,
+      loading,
+      error,
+      userEmail: user?.email,
+    });
+  }, [user, householdId, loading, error]);
+
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <Card className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading authentication...</span>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle authentication error - show more detailed info
+  if (error) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <Card className="p-6">
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-2">Authentication Error</p>
+            <p className="text-sm text-gray-600 mb-4">Error: {error}</p>
+            <p className="text-sm text-gray-600 mb-4">
+              Debug: User={user ? "present" : "missing"}, HouseholdId=
+              {householdId || "missing"}
+            </p>
+            <div className="space-y-2">
+              <Button onClick={() => router.push("/login")}>Go to Login</Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle missing user
+  if (!user) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <Card className="p-6">
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">No user session found</p>
+            <Button onClick={() => router.push("/login")}>Go to Login</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle missing household
+  if (!householdId) {
+    return (
+      <div className="container max-w-4xl py-8">
+        <Card className="p-6">
+          <div className="text-center py-8">
+            <p className="text-yellow-500 mb-4">
+              No household found for user: {user.email}
+            </p>
+            <p className="text-sm text-gray-600 mb-4">
+              You may need to create or join a household first.
+            </p>
+            <Button onClick={() => router.push("/onboarding")}>
+              Set Up Household
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const handleNext = () => {
     console.log("🔵 handleNext called, current step:", currentStep);
@@ -100,7 +174,6 @@ export default function BudgetSetupPage() {
   };
 
   const renderStep = () => {
-    if (!householdId) return null;
     switch (STEPS[currentStep].id) {
       case "income":
         return (
@@ -150,6 +223,12 @@ export default function BudgetSetupPage() {
                 Let's set up your budget step by step. We'll start with your
                 income and work our way through your expenses and savings goals.
               </p>
+              {/* Debug info in development */}
+              {process.env.NODE_ENV === "development" && (
+                <p className="text-xs text-gray-500">
+                  Debug: User {user.email}, Household {householdId}
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -168,24 +247,37 @@ export default function BudgetSetupPage() {
                 />
               </div>
 
-              {loading ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                renderStep()
-              )}
+              <div className="min-h-[400px]">{renderStep()}</div>
 
               <div className="flex justify-between pt-4">
                 <Button
+                  type="button"
                   variant="outline"
                   onClick={handlePrevious}
-                  disabled={currentStep === 0 || isSubmitting}
+                  disabled={currentStep === 0}
                 >
                   Previous
                 </Button>
-                {currentStep < STEPS.length - 1 && (
-                  <Button onClick={handleNext} disabled={isSubmitting}>
+
+                {currentStep === STEPS.length - 1 ? (
+                  <Button
+                    onClick={handleComplete}
+                    disabled={isSubmitting || !completedSteps[currentStep]}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Completing...
+                      </>
+                    ) : (
+                      "Complete Setup"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleNext}
+                    disabled={currentStep >= STEPS.length - 1}
+                  >
                     Next
                   </Button>
                 )}
