@@ -11,6 +11,7 @@ export type FrequencyType =
 
 export interface BaseFrequencyConfig {
   type: FrequencyType;
+  [key: string]: any;
 }
 
 export interface MonthlyConfig extends BaseFrequencyConfig {
@@ -80,4 +81,16 @@ export type FixedExpenseWithFrequency = Tables<"fixed_expenses"> & {
 export type IncomeSourceWithFrequency = Tables<"income_sources"> & {
   frequency_config: FrequencyConfig | null;
   frequency_type: FrequencyType | null;
+};
+
+// Helper function to convert frequency config to JSON
+export const frequencyConfigToJson = (config: FrequencyConfig | null): any => {
+  if (!config) return null;
+  return JSON.parse(JSON.stringify(config));
+};
+
+// Helper function to convert JSON to frequency config
+export const jsonToFrequencyConfig = (json: any): FrequencyConfig | null => {
+  if (!json) return null;
+  return json as FrequencyConfig;
 };

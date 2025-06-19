@@ -171,7 +171,7 @@ export function formatFrequencyDisplay(
     case "biweekly": {
       const biweeklyConfig =
         config as import("@/types/frequency").BiweeklyConfig;
-      return `Every 2 weeks (${biweeklyConfig.day_of_week})`;
+      return `Every 2 weeks (${capitalizeFirst(biweeklyConfig.day_of_week)})`;
     }
     case "weekly": {
       const weeklyConfig = config as import("@/types/frequency").WeeklyConfig;
@@ -194,7 +194,17 @@ export function formatFrequencyDisplay(
           quarterlyConfig.day_of_month ?? 1
         )} of each quarter)`;
       } else {
-        return "Quarterly (Custom dates)";
+        // Format custom dates with timezone handling
+        const formattedDates =
+          quarterlyConfig.custom_dates?.map((date) => {
+            if (!date) return "Not set";
+            // Parse the date and adjust for timezone
+            const [year, month, day] = date.split("-").map(Number);
+            return `${getMonthName(month).slice(0, 3)} ${day}`;
+          }) || Array(4).fill("Not set");
+
+        // More concise display
+        return `Quarterly: ${formattedDates.join(" / ")}`;
       }
     }
     case "semi_monthly": {
@@ -285,10 +295,9 @@ export function getDayOptions() {
 }
 
 // Helper functions
-function getOrdinalSuffix(num: number): string {
-  if (!num) return "";
-  const j = num % 10,
-    k = num % 100;
+export function getOrdinalSuffix(num: number): string {
+  const j = num % 10;
+  const k = num % 100;
   if (j === 1 && k !== 11) return "st";
   if (j === 2 && k !== 12) return "nd";
   if (j === 3 && k !== 13) return "rd";

@@ -352,6 +352,7 @@ export type Database = {
           household_id: string
           id: string
           is_active: boolean | null
+          is_primary: boolean | null
           name: string
           next_payment_date: string | null
           updated_at: string | null
@@ -365,6 +366,7 @@ export type Database = {
           household_id: string
           id?: string
           is_active?: boolean | null
+          is_primary?: boolean | null
           name: string
           next_payment_date?: string | null
           updated_at?: string | null
@@ -378,6 +380,7 @@ export type Database = {
           household_id?: string
           id?: string
           is_active?: boolean | null
+          is_primary?: boolean | null
           name?: string
           next_payment_date?: string | null
           updated_at?: string | null

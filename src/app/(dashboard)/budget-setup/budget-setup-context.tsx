@@ -6,19 +6,19 @@ import React, {
   ReactNode,
 } from "react";
 import { FrequencyType, FrequencyConfig } from "@/types/frequency";
+import { Tables } from "@/types/supabase";
 
 // --- Step Data Types ---
-export interface IncomeSource {
-  name: string;
-  amount: number;
+export type IncomeSource = Omit<
+  Tables<"income_sources">,
+  "frequency_type" | "frequency_config"
+> & {
   frequency_type: FrequencyType | null;
   frequency_config: FrequencyConfig | null;
-  anchor_date: string | null;
-  next_payment_date: string | null;
-}
+};
 
 export interface IncomeStepData {
-  primaryIncome: IncomeSource;
+  primaryIncome: IncomeSource | null;
   secondaryIncomes: IncomeSource[];
 }
 
