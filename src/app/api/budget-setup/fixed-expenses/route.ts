@@ -73,7 +73,9 @@ export async function GET(request: Request) {
     // Fetch fixed expenses
     const { data: expenses, error } = await supabase
       .from("fixed_expenses")
-      .select("*")
+      .select(
+        "id, name, category, estimated_amount, is_variable, notes, frequency_type, frequency_config, anchor_date, next_due_date"
+      )
       .eq("household_id", householdId)
       .eq("is_active", true)
       .order("name");
