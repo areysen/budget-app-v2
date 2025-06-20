@@ -108,7 +108,14 @@ export function IncomeSourceForm({
       return;
     }
 
-    await onSubmit(data);
+    const dataToSubmit = { ...data };
+    const amountValue = dataToSubmit.amount as any;
+    if (typeof amountValue === "string") {
+      const parsedAmount = parseFloat(amountValue.replace(/[^0-9.-]+/g, ""));
+      dataToSubmit.amount = isNaN(parsedAmount) ? 0 : parsedAmount;
+    }
+
+    await onSubmit(dataToSubmit);
   });
 
   const handleFrequencyTypeChange = (type: string) => {

@@ -54,7 +54,7 @@ const mapDbExpenseToContext = (dbExpense: DbFixedExpense): FixedExpense => {
     id: dbExpense.id,
     name: dbExpense.name || "",
     category: dbExpense.category || "",
-    amount: dbExpense.estimated_amount,
+    amount: dbExpense.estimated_amount ?? 0,
     isVariable: dbExpense.is_variable ?? false,
     notes: dbExpense.notes || undefined,
     frequency_type: dbExpense.frequency_type as FrequencyType | null,
@@ -118,7 +118,7 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
   const rowVirtualizer = useVirtualizer({
     count: state.expenses.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 130, // Adjusted for padding
+    estimateSize: () => 146, // Adjusted for padding and spacing
     overscan: 5,
   });
 
@@ -238,9 +238,13 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
     const isEditing = !!state.editingExpense;
 
     try {
+      const expenseData = isEditing
+        ? { ...formData, id: state.editingExpense }
+        : formData;
+
       const payload = {
         householdId,
-        expenses: [formData],
+        expenses: [expenseData],
       };
       const response = await fetch(`/api/budget-setup/fixed-expenses`, {
         method: isEditing ? "PUT" : "POST",
@@ -337,29 +341,39 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
                   position: "relative",
                 }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const expense = state.expenses[virtualItem.index];
-                  return (
-                    <div
-                      key={virtualItem.key}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: `${virtualItem.size}px`,
-                        transform: `translateY(${virtualItem.start}px)`,
-                        padding: "0.5rem",
-                      }}
-                    >
-                      <ExpenseSourceSummaryCard
-                        expense={mapDbExpenseToContext(expense)}
-                        onEdit={() => handleEditExpense(expense)}
-                        onDelete={() => handleDeleteExpense(expense.id)}
-                      />
-                    </div>
-                  );
-                })}
+                <div className="space-y-4" ref={parentRef}>
+                  {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const expense = state.expenses[virtualItem.index];
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: `${virtualItem.size}px`,
+                          transform: `translateY(${virtualItem.start}px)`,
+                          padding: "0.5rem",
+                        }}
+                      >
+                        <Suspense
+                          fallback={
+                            <div className="flex items-center justify-center p-8">
+                              <Loader2 className="h-8 w-8 animate-spin" />
+                            </div>
+                          }
+                        >
+                          <ExpenseSourceSummaryCard
+                            expense={mapDbExpenseToContext(expense)}
+                            onEdit={() => handleEditExpense(expense)}
+                            onDelete={() => handleDeleteExpense(expense.id)}
+                          />
+                        </Suspense>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -367,20 +381,18 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
 
       {(state.addingNewExpense || state.editingExpense) && (
         <div className="animate-in fade-in duration-300">
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            }
-          >
-            <FixedExpenseForm
-              expense={currentExpense}
-              onSave={handleSaveExpense}
-              onCancel={handleCancelForm}
-              saving={state.saving}
-            />
-          </Suspense>
+          <Card className="p-4 md:p-6 mt-4">
+            <Suspense fallback={<Loader2 className="animate-spin" />}>
+              <FixedExpenseForm
+                onSave={handleSaveExpense}
+                onCancel={handleCancelForm}
+                expense={state.expenses.find(
+                  (e) => e.id === state.editingExpense
+                )}
+                saving={state.saving}
+              />
+            </Suspense>
+          </Card>
         </div>
       )}
     </div>

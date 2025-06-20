@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  lazy,
+  Suspense,
+} from "react";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { EnvelopeSummaryCard } from "./envelope-summary-card";
-import { EnvelopeForm } from "./envelope-form";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tables } from "@/types/supabase";
@@ -33,12 +39,12 @@ const DEFAULT_ENVELOPES = [
   {
     name: "Fun Money",
     default_amount: 150,
-    rollover_rule: "always_to_savings",
+    rollover_rule: "save",
   },
   {
     name: "Dining Out",
     default_amount: 100,
-    rollover_rule: "always_to_savings",
+    rollover_rule: "save",
   },
   {
     name: "Personal Care",
@@ -49,9 +55,13 @@ const DEFAULT_ENVELOPES = [
   {
     name: "Miscellaneous",
     default_amount: 50,
-    rollover_rule: "always_rollover",
+    rollover_rule: "rollover",
   },
 ];
+
+const EnvelopeForm = lazy(() =>
+  import("./envelope-form").then((module) => ({ default: module.EnvelopeForm }))
+);
 
 interface StepEnvelopesProps {
   householdId: string;
@@ -91,6 +101,13 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
     saving: false,
     error: null,
   });
+
+  // Sync with context whenever envelopes change
+  useEffect(() => {
+    setStepData("envelopes", {
+      envelopes: state.envelopes.map(mapDbEnvelopeToContext),
+    });
+  }, [state.envelopes, setStepData]);
 
   // Load envelopes on component mount
   useEffect(() => {
@@ -176,6 +193,12 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
       if (!response.ok) throw new Error("Failed to save envelope");
       const { envelope: savedEnvelope } = await response.json();
 
+      toast.success(
+        `Envelope "${savedEnvelope.name}" ${
+          state.editingEnvelope ? "updated" : "added"
+        } successfully.`
+      );
+
       setState((prev) => {
         const updatedEnvelopes = isEditing
           ? prev.envelopes.map((e) =>
@@ -187,10 +210,6 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
           (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
         );
 
-        setStepData("envelopes", {
-          envelopes: updatedEnvelopes.map(mapDbEnvelopeToContext),
-        });
-
         return {
           ...prev,
           envelopes: updatedEnvelopes,
@@ -199,14 +218,16 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
           saving: false,
         };
       });
-      toast.success(`Envelope ${isEditing ? "updated" : "added"} successfully`);
     } catch (error) {
       console.error("Error saving envelope:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred.";
       setState((prev) => ({
         ...prev,
-        error: "Failed to save envelope. Please try again.",
+        error: errorMessage,
         saving: false,
       }));
+      toast.error(`Error: ${errorMessage}`);
     }
   };
 
@@ -330,57 +351,74 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Spending Envelopes</h2>
-        <div className="flex gap-2">
-          {state.envelopes.length === 0 && (
-            <Button
-              onClick={handleAddDefaults}
-              variant="outline"
-              disabled={state.saving}
-            >
-              Add Suggested Envelopes
+        {!state.addingNewEnvelope && !state.editingEnvelope && (
+          <div className="flex gap-2">
+            {state.envelopes.length === 0 && (
+              <Button
+                onClick={handleAddDefaults}
+                variant="outline"
+                disabled={state.saving}
+              >
+                Add Suggested Envelopes
+              </Button>
+            )}
+            <Button onClick={handleAddNew} disabled={state.saving}>
+              Add New Envelope
             </Button>
-          )}
-          <Button onClick={handleAddNew} disabled={state.saving}>
-            Add New Envelope
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
-      {state.envelopes.length === 0 && !state.addingNewEnvelope && (
-        <div className="text-center p-8 border rounded-md bg-muted/20">
-          <p className="text-muted-foreground">
-            No envelopes yet. Add your first envelope or use our suggested
-            defaults.
-          </p>
-        </div>
-      )}
+      {!state.loading &&
+        state.envelopes.length === 0 &&
+        !state.addingNewEnvelope &&
+        !state.editingEnvelope && (
+          <div className="text-center p-8 border rounded-md bg-muted/20">
+            <p className="text-muted-foreground">
+              No envelopes yet. Add your first envelope or use our suggested
+              defaults.
+            </p>
+          </div>
+        )}
+
+      {/* Show envelope cards when not adding/editing */}
+      {state.envelopes.length > 0 &&
+        !state.addingNewEnvelope &&
+        !state.editingEnvelope && (
+          <div className="animate-in fade-in duration-300 space-y-4">
+            {state.envelopes.map((envelope) => (
+              <EnvelopeSummaryCard
+                key={envelope.id}
+                envelope={mapDbEnvelopeToContext(envelope)}
+                onEdit={() => handleEdit(envelope)}
+                onDelete={() => handleDelete(envelope)}
+              />
+            ))}
+          </div>
+        )}
 
       {/* Show form when adding or editing */}
       {(state.addingNewEnvelope || state.editingEnvelope) && (
-        <EnvelopeForm
-          householdId={householdId}
-          initialData={
-            state.editingEnvelope
-              ? mapDbEnvelopeToContext(state.editingEnvelope)
-              : undefined
-          }
-          onSave={handleSave}
-          onCancel={handleCancel}
-          saving={state.saving}
-        />
-      )}
-
-      {/* Show envelope cards when not adding/editing */}
-      {!state.addingNewEnvelope && !state.editingEnvelope && (
-        <div className="space-y-4">
-          {state.envelopes.map((envelope) => (
-            <EnvelopeSummaryCard
-              key={envelope.id}
-              envelope={mapDbEnvelopeToContext(envelope)}
-              onEdit={() => handleEdit(envelope)}
-              onDelete={() => handleDelete(envelope)}
+        <div className="animate-in fade-in duration-300">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            }
+          >
+            <EnvelopeForm
+              householdId={householdId}
+              initialData={
+                state.editingEnvelope
+                  ? mapDbEnvelopeToContext(state.editingEnvelope)
+                  : undefined
+              }
+              onSave={handleSave}
+              onCancel={handleCancel}
+              saving={state.saving}
             />
-          ))}
+          </Suspense>
         </div>
       )}
 

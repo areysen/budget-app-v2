@@ -5,8 +5,10 @@ import { z } from "zod";
 const envelopeSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
-  amount: z.number().min(0),
-  rolloverRule: z.enum(["rollover", "rollover_limit", "save"]),
+  amount: z.number().min(0).default(0),
+  rolloverRule: z
+    .enum(["rollover", "rollover_limit", "save"])
+    .default("rollover"),
   rolloverLimit: z.number().optional().nullable(),
   household_id: z.string(),
 });
@@ -50,22 +52,14 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from("envelopes")
-      .select("id, name, default_amount, rollover_rule, rollover_limit")
+      .select("*")
       .eq("household_id", householdId)
       .eq("is_active", true)
-      .order("name");
+      .order("sort_order");
 
     if (error) throw error;
 
-    return NextResponse.json(
-      data.map((e) => ({
-        id: e.id,
-        name: e.name,
-        amount: e.default_amount,
-        rolloverRule: e.rollover_rule,
-        rolloverLimit: e.rollover_limit,
-      }))
-    );
+    return NextResponse.json({ envelopes: data || [] });
   } catch (error: any) {
     console.error("Error fetching envelopes:", error);
     return NextResponse.json(
@@ -83,17 +77,21 @@ export async function POST(request: Request) {
 
     await verifyUserAccess(supabase, data.household_id);
 
-    const { error } = await supabase.from("envelopes").insert({
-      household_id: data.household_id,
-      name: data.name,
-      default_amount: data.amount,
-      rollover_rule: data.rolloverRule,
-      rollover_limit: data.rolloverLimit,
-    });
+    const { data: newEnvelope, error } = await supabase
+      .from("envelopes")
+      .insert({
+        household_id: data.household_id,
+        name: data.name,
+        default_amount: data.amount,
+        rollover_rule: data.rolloverRule,
+        rollover_limit: data.rolloverLimit,
+      })
+      .select()
+      .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ envelope: newEnvelope });
   } catch (error: any) {
     console.error("Error creating envelope:", error);
     return NextResponse.json(
@@ -118,7 +116,7 @@ export async function PUT(request: Request) {
 
     await verifyUserAccess(supabase, data.household_id);
 
-    const { error } = await supabase
+    const { data: updatedEnvelope, error } = await supabase
       .from("envelopes")
       .update({
         name: data.name,
@@ -127,11 +125,13 @@ export async function PUT(request: Request) {
         rollover_limit: data.rolloverLimit,
       })
       .eq("id", data.id)
-      .eq("household_id", data.household_id);
+      .eq("household_id", data.household_id)
+      .select()
+      .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ envelope: updatedEnvelope });
   } catch (error: any) {
     console.error("Error updating envelope:", error);
     return NextResponse.json(

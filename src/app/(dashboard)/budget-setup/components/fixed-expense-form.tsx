@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { FrequencyType, FrequencyConfig } from "@/types/frequency";
 import {
   createFrequencyConfig,
+  getFrequencyOptions,
   validateFrequencyConfig,
 } from "@/lib/utils/frequency-helpers";
 import { CategorySelector } from "@/components/forms/category-selector";
@@ -22,6 +23,13 @@ import { FrequencyPreview } from "@/components/forms/frequency-preview";
 import { supabase } from "@/lib/supabase/client";
 import { Tables } from "@/types/supabase";
 import { useUser } from "@/hooks/use-user";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Form schema that matches database types
 const formSchema = z.object({
@@ -129,6 +137,24 @@ export function FixedExpenseForm({
       next_due_date: expense?.next_due_date || null,
     },
   });
+
+  useEffect(() => {
+    if (expense) {
+      form.reset({
+        name: expense.name || "",
+        category: expense.category || "",
+        amount: expense.estimated_amount || 0,
+        isVariable: expense.is_variable ?? false,
+        notes: expense.notes || "",
+        frequency_type:
+          (expense.frequency_type as FormSchema["frequency_type"]) || "monthly",
+        frequency_config:
+          expense.frequency_config || createFrequencyConfig.monthly(1),
+        anchor_date: expense.anchor_date || null,
+        next_due_date: expense.next_due_date || null,
+      });
+    }
+  }, [expense, form]);
 
   // Load categories only after we have householdId and user is loaded
   useEffect(() => {
@@ -590,24 +616,27 @@ export function FixedExpenseForm({
 
                 <div className="space-y-2">
                   <Label>Frequency Type</Label>
-                  <select
+                  <Select
                     value={form.watch("frequency_type") || ""}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       handleFrequencyTypeChange(
-                        e.target.value as FormSchema["frequency_type"]
+                        value as FormSchema["frequency_type"]
                       )
                     }
-                    className="w-full p-2 border rounded-md"
                   >
-                    <option value="">Select frequency...</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="biweekly">Bi-weekly</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="semi_monthly">Semi-monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="per_paycheck">Per Paycheck</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select frequency..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getFrequencyOptions()
+                        .filter((option) => option.value !== "per_paycheck")
+                        .map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {form.watch("frequency_type") && (

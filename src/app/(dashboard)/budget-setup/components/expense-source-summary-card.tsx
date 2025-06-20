@@ -51,7 +51,7 @@ export const ExpenseSourceSummaryCard = React.memo(
 
             <div className="space-y-1">
               <p className="text-lg font-mono font-bold text-foreground">
-                {formatCurrency(expense.amount)}
+                {formatCurrency(expense.amount ?? 0)}
               </p>
               <div className="text-sm text-gray-600 space-y-0.5">
                 <p>{expense.category}</p>

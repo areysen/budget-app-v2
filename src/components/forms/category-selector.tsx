@@ -61,9 +61,7 @@ export function CategorySelector({
     }
   }, [value, availableCategories]);
 
-  const systemCategories = SUGGESTED_CATEGORIES.filter((cat) =>
-    availableCategories.includes(cat)
-  );
+  const systemCategories = SUGGESTED_CATEGORIES;
 
   const customCategories = availableCategories.filter(
     (cat) => !SUGGESTED_CATEGORIES.includes(cat)
@@ -73,7 +71,6 @@ export function CategorySelector({
     if (selectedValue === "__custom__") {
       setIsCustom(true);
       setCustomValue("");
-      onChange("");
     } else {
       setIsCustom(false);
       onChange(selectedValue);

@@ -221,11 +221,55 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Fix Critical Bugs in Fixed Expenses Step",
+        "description": "Fixed Expenses has multiple critical bugs beyond performance: 1) Cards overlapping in list, 2) Amount showing NaN, 3) Other category validation error, 4) Expense ID required for updates error, 5) Frequency dropdown missing options that Income has",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Fix Envelope Data Loading and Creation",
+        "description": "Envelopes don't load from database and creation fails with validation errors. Fix data fetching, add default values for amount (0) and rolloverRule ('rollover')",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Standardize UI Pattern Across All Steps",
+        "description": "Implement Income step's UI pattern (list/form switching, hide list when editing, Add button at top) for Fixed Expenses, Envelopes, and Savings Goals",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "Verify Auth Context Persistence",
+        "description": "Users reported losing householdId when navigating away from budget setup and returning. Test and fix if still an issue.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-06-20T15:12:13.375Z",
-      "updated": "2025-06-20T17:52:49.638Z",
+      "updated": "2025-06-20T18:30:28.354Z",
       "description": "Tasks for master context"
     }
   }
