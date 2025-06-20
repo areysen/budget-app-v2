@@ -141,43 +141,47 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
             convertDbIncomeToFrontend
           );
 
-          // Update both state and context
           setState((prev) => ({
             ...prev,
             primaryIncome: convertedPrimary,
             secondaryIncomes: convertedSecondary,
-            loading: false,
             editingPrimary: !convertedPrimary,
+            loading: false,
           }));
 
-          // Only update context if we have new data
-          if (convertedPrimary || convertedSecondary.length > 0) {
-            updateStepData(convertedPrimary, convertedSecondary);
-          }
+          // Update context with loaded data
+          updateStepData(convertedPrimary, convertedSecondary);
         } catch (error) {
           console.error("Error loading income sources:", error);
-          toast.error("Failed to load income sources");
           setState((prev) => ({ ...prev, loading: false }));
+          // Don't show error toast here, just silently fail and allow manual entry
         }
       };
 
-      loadIncomeSources();
-    }, [householdId, updateStepData]); // Remove getStepData from dependencies to prevent cycles
+      if (householdId && !userLoading) {
+        loadIncomeSources();
+      }
+    }, [householdId, userLoading]);
 
+    // Expose submit method to parent
     useImperativeHandle(ref, () => ({
-      submit: async () => {
+      submit: () => {
         if (!state.primaryIncome) {
-          toast.error("Please add a primary income source before continuing");
+          toast.error("Please add your primary income source");
           return;
         }
         onComplete();
       },
     }));
 
-    const handleDeleteIncome = async (incomeId: string) => {
+    const handleDeleteIncome = async (id: string) => {
+      if (!confirm("Are you sure you want to delete this income source?")) {
+        return;
+      }
+
       try {
         const response = await fetch(
-          `/api/budget-setup/income-sources?id=${incomeId}&householdId=${householdId}`,
+          `/api/budget-setup/income-sources?id=${id}&householdId=${householdId}`,
           {
             method: "DELETE",
           }
@@ -187,24 +191,17 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
           throw new Error("Failed to delete income source");
         }
 
-        // Update state based on whether it was primary or secondary income
-        if (state.primaryIncome?.id === incomeId) {
-          setState((prev) => ({
-            ...prev,
-            primaryIncome: null,
-            editingPrimary: true,
-          }));
-          updateStepData(null, state.secondaryIncomes);
-        } else {
-          const updatedSecondaryIncomes = state.secondaryIncomes.filter(
-            (income) => income.id !== incomeId
-          );
-          setState((prev) => ({
-            ...prev,
-            secondaryIncomes: updatedSecondaryIncomes,
-          }));
-          updateStepData(state.primaryIncome, updatedSecondaryIncomes);
-        }
+        setState((prev) => ({
+          ...prev,
+          secondaryIncomes: prev.secondaryIncomes.filter(
+            (income) => income.id !== id
+          ),
+        }));
+
+        updateStepData(
+          state.primaryIncome,
+          state.secondaryIncomes.filter((income) => income.id !== id)
+        );
 
         toast.success("Income source deleted successfully");
       } catch (error) {
@@ -291,14 +288,12 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                       }
                     : {
                         ...data,
-                        household_id: householdId,
+                        householdId: householdId,
                         is_primary: true,
                       };
 
                   const response = await fetch(
-                    `/api/budget-setup/income-sources?householdId=${householdId}${
-                      state.primaryIncome ? `&id=${state.primaryIncome.id}` : ""
-                    }`,
+                    "/api/budget-setup/income-sources",
                     {
                       method,
                       headers: {
@@ -312,9 +307,10 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     throw new Error("Failed to save income source");
                   }
 
-                  const savedIncome = await response.json();
+                  // IMPORTANT FIX: Destructure the incomeSource from response
+                  const { incomeSource } = await response.json();
                   const convertedIncome =
-                    convertDbIncomeToFrontend(savedIncome);
+                    convertDbIncomeToFrontend(incomeSource);
 
                   setState((prev) => ({
                     ...prev,
@@ -343,16 +339,18 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
               {state.primaryIncome ? (
                 <IncomeSourceSummaryCard
                   income={state.primaryIncome}
-                  onEdit={() =>
-                    setState((prev) => ({ ...prev, editingPrimary: true }))
-                  }
-                  onDelete={() =>
-                    state.primaryIncome &&
-                    handleDeleteIncome(state.primaryIncome.id)
-                  }
+                  onEdit={() => {
+                    setState((prev) => ({
+                      ...prev,
+                      editingPrimary: true,
+                    }));
+                  }}
                 />
               ) : (
-                <Card className="p-6">
+                <Card className="p-6 border-dashed">
+                  <p className="text-gray-500 mb-4">
+                    No primary income source added yet
+                  </p>
                   <Button
                     onClick={() =>
                       setState((prev) => ({ ...prev, editingPrimary: true }))
@@ -391,8 +389,8 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                       },
                       body: JSON.stringify({
                         ...data,
-                        is_primary: false,
                         householdId: householdId,
+                        is_primary: false,
                       }),
                     }
                   );
@@ -401,6 +399,7 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     throw new Error("Failed to save income source");
                   }
 
+                  // IMPORTANT FIX: Destructure the incomeSource from response
                   const { incomeSource } = await response.json();
                   const convertedIncome =
                     convertDbIncomeToFrontend(incomeSource);
@@ -419,7 +418,7 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     ...state.secondaryIncomes,
                     convertedIncome,
                   ]);
-                  toast.success("Secondary income saved successfully!");
+                  toast.success("Secondary income added successfully!");
                 } catch (error) {
                   console.error("Error saving income source:", error);
                   toast.error(
@@ -484,6 +483,7 @@ const StepIncome = forwardRef<{ submit: () => void }, StepIncomeProps>(
                     throw new Error("Failed to save income source");
                   }
 
+                  // IMPORTANT FIX: Destructure the incomeSource from response
                   const { incomeSource } = await response.json();
                   const convertedIncome =
                     convertDbIncomeToFrontend(incomeSource);

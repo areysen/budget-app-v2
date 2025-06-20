@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Budget App v2 - Claude Documentation
 
 ## Quick Reference
@@ -13,6 +17,12 @@ npm run start        # Start production server
 
 # Code Quality
 npm run lint         # Run ESLint
+
+# Task Management
+npm run task         # Launch Task Master AI
+npm run task:create  # Create new task
+npm run task:list    # List all tasks
+npm run task:status  # Show task status
 
 # Database (Supabase CLI required)
 supabase start       # Start local Supabase instance
@@ -205,25 +215,44 @@ const budget = calculateConservativeBudget(confirmedIncome, expectedIncome);
 4. **Approval workflow**: Both users can review/approve
 5. **Envelope assignment**: Required before final approval
 
+## Task Management Integration
+
+This project uses **Task Master AI** for systematic task tracking and development workflow management.
+
+### Task Commands
+- `npm run task` - Interactive task management interface
+- `npm run task:create` - Create new tasks with descriptions
+- `npm run task:list` - View all tasks and their status
+- `npm run task:status` - Check current task status
+
+### Git Workflow with Task Master
+When working on tasks:
+1. **Create feature branch** for task: `git checkout -b task/ID-description`
+2. **Reference task ID** in all commit messages: `feat(auth): add debugging - Task #15`
+3. **Mark task complete** when done: `task-master set-status --id=15 --status=done`
+4. **Merge to main** and continue: `git checkout main && git merge task/15-fix`
+
 ## Key Files Reference
 
 ### Configuration
-- `/Users/areysen/budget-app-v2/.cursorrules` - Comprehensive development guidelines
-- `/Users/areysen/budget-app-v2/components.json` - shadcn/ui configuration
-- `/Users/areysen/budget-app-v2/middleware.ts` - Auth protection
-- `/Users/areysen/budget-app-v2/supabase/config.toml` - Local database config
+- `.cursorrules` - Comprehensive development guidelines including design system
+- `components.json` - shadcn/ui configuration (New York style, Lucide icons)
+- `middleware.ts` - Auth protection for all dashboard routes
+- `supabase/config.toml` - Local database config with OpenAI integration
 
 ### Core Libraries  
-- `/Users/areysen/budget-app-v2/src/lib/supabase/` - Database clients
-- `/Users/areysen/budget-app-v2/src/lib/utils/currency.ts` - Money formatting
-- `/Users/areysen/budget-app-v2/src/lib/utils/dates.ts` - Period date logic
-- `/Users/areysen/budget-app-v2/src/lib/periods.ts` - Period management
-- `/Users/areysen/budget-app-v2/src/types/supabase.ts` - Generated DB types
+- `src/lib/supabase/` - Database clients (client.ts, server.ts)
+- `src/lib/utils/currency.ts` - Money formatting utilities
+- `src/lib/utils/dates.ts` - Period date logic
+- `src/lib/periods.ts` - Period management business logic
+- `src/lib/services/frequency-calculator.ts` - Frequency calculation system
+- `src/types/supabase.ts` - Generated database types
 
 ### Key Components
-- `/Users/areysen/budget-app-v2/src/app/(dashboard)/dashboard/page.tsx` - Main dashboard
-- `/Users/areysen/budget-app-v2/src/components/auth/AuthGuard.tsx` - Route protection
-- `/Users/areysen/budget-app-v2/src/components/dashboard/envelope-balances.tsx` - Budget display
+- `src/app/(dashboard)/dashboard/page.tsx` - Main dashboard
+- `src/components/auth/AuthGuard.tsx` - Route protection
+- `src/components/dashboard/envelope-balances.tsx` - Budget display
+- `src/app/(dashboard)/budget-setup/` - Multi-step budget setup wizard
 
 ## Development Workflow
 
