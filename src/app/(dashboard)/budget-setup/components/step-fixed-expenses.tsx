@@ -8,6 +8,8 @@ import React, {
   useState,
   useCallback,
   useRef,
+  lazy,
+  Suspense,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +17,6 @@ import { Plus, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useBudgetSetup, FixedExpense } from "../budget-setup-context";
 import { ExpenseSourceSummaryCard } from "./expense-source-summary-card";
-import { FixedExpenseForm } from "./fixed-expense-form";
 import { useUser } from "@/hooks/use-user";
 import { Tables } from "@/types/supabase";
 import {
@@ -25,6 +26,12 @@ import {
   frequencyConfigToJson,
 } from "@/types/frequency";
 import { useVirtualizer } from "@tanstack/react-virtual";
+
+const FixedExpenseForm = lazy(() =>
+  import("./fixed-expense-form").then((module) => ({
+    default: module.FixedExpenseForm,
+  }))
+);
 
 type FixedExpenseType = Tables<"fixed_expenses">;
 
@@ -402,12 +409,20 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       )}
 
       {(state.addingNewExpense || state.editingExpense) && (
-        <FixedExpenseForm
-          expense={currentExpense}
-          onSave={handleSaveExpense}
-          onCancel={handleCancelForm}
-          saving={state.saving}
-        />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          }
+        >
+          <FixedExpenseForm
+            expense={currentExpense}
+            onSave={handleSaveExpense}
+            onCancel={handleCancelForm}
+            saving={state.saving}
+          />
+        </Suspense>
       )}
     </div>
   );
