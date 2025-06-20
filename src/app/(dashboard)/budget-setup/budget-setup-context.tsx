@@ -61,10 +61,13 @@ export interface BudgetEnvelopesStep {
 }
 
 export interface SavingsGoal {
+  id: string;
   name: string;
   targetAmount: number;
+  currentAmount: number;
   targetDate?: string;
   isEmergencyFund: boolean;
+  isRoundupTarget: boolean;
   defaultContribution: number;
 }
 export interface BudgetSavingsGoalsStep {
@@ -90,17 +93,25 @@ const LOCAL_STORAGE_KEY = "budget-setup-wizard";
 // --- Context ---
 export type BudgetSetupContextType = {
   stepData: BudgetSetupState;
-  getStepData: (step: keyof BudgetSetupState) => any;
-  setStepData: (step: keyof BudgetSetupState, data: any) => void;
+  getStepData: <K extends keyof BudgetSetupState>(
+    step: K
+  ) => BudgetSetupState[K];
+  setStepData: <K extends keyof BudgetSetupState>(
+    step: K,
+    data: NonNullable<BudgetSetupState[K]>
+  ) => void;
   addIncomeSource: (source: IncomeSource) => void;
   removeIncomeSource: (id: string) => void;
   updateIncomeSource: (id: string, source: IncomeSource) => void;
   addFixedExpense: (expense: FixedExpense) => void;
   removeFixedExpense: (id: string) => void;
   updateFixedExpense: (id: string, expense: FixedExpense) => void;
-  addSavingsGoal: (goal: SavingsGoal) => void;
+  addSavingsGoal: (goal: Omit<SavingsGoal, "id">) => void;
   removeSavingsGoal: (id: string) => void;
-  updateSavingsGoal: (id: string, goal: SavingsGoal) => void;
+  updateSavingsGoal: (
+    id: string,
+    goal: Partial<Omit<SavingsGoal, "id">>
+  ) => void;
   addEnvelope: (envelope: Envelope) => void;
   removeEnvelope: (id: string) => void;
   updateEnvelope: (id: string, envelope: Envelope) => void;
@@ -224,7 +235,10 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({
             ...prev,
             savingsGoals: {
-              goals: [...(prev.savingsGoals?.goals || []), goal],
+              goals: [
+                ...(prev.savingsGoals?.goals || []),
+                { ...goal, id: crypto.randomUUID() },
+              ],
             },
           }));
         },
@@ -234,7 +248,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
             return {
               ...prev,
               savingsGoals: {
-                goals: prev.savingsGoals.goals.filter((g) => g.name !== id),
+                goals: prev.savingsGoals.goals.filter((g) => g.id !== id),
               },
             };
           });
@@ -246,7 +260,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
               ...prev,
               savingsGoals: {
                 goals: prev.savingsGoals.goals.map((g) =>
-                  g.name === id ? goal : g
+                  g.id === id ? { ...g, ...goal } : g
                 ),
               },
             };

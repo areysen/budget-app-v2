@@ -4,7 +4,7 @@ globs:
 alwaysApply: true
 ---
 ---
-description: Git workflow integration with Task Master AI for branch-per-task development
+description: Git workflow integration with Task Master AI for branch-per-task development with mandatory research-first approach
 globs: **/*
 filesToApplyRule: **/*
 alwaysApply: true
@@ -18,11 +18,28 @@ alwaysApply: true
   - Keep branches focused and short-lived
   - Merge back to main when task is complete
 
+- **Research-First Task Selection**
+  - Before starting any task, always analyze complexity with research
+  - Required workflow before branch creation:
+    ```bash
+    # 1. REQUIRED: Research and analyze before starting
+    task-master analyze-complexity --research
+    task-master complexity-report
+    
+    # 2. Select task based on research insights
+    task-master next
+    task-master show <id>
+    
+    # 3. Research-backed expansion if needed
+    task-master expand --id=<id> --research --force
+    ```
+
 - **Starting a New Task**
   - Always check current task: `task-master show <id>`
   - Create branch immediately: `git checkout -b task/<id>-<description>`
   - Examples:
     ```bash
+    # After research and task selection
     task-master show 15
     git checkout -b task/15-fix-auth-context
     git checkout -b task/23-envelope-summary-card
@@ -32,79 +49,158 @@ alwaysApply: true
 - **During Task Development**
   - Make frequent, focused commits with task ID references
   - Use conventional commit format with task tracking
+  - Reference research findings in commit messages when relevant
   - Commit message pattern:
     ```
     <type>(<scope>): <description> - Task #<id>
     
     <detailed description>
+    <research insights applied>
     <acceptance criteria met>
     <notes for reviewers>
     ```
 
 - **Commit Message Examples**
   ```bash
-  # ✅ DO: Clear, focused commits with task reference
+  # ✅ DO: Clear, focused commits with task reference and research context
   git commit -m "feat(auth): fix household context persistence - Task #15
 
   - Fixed useUser hook to persist householdId across navigation  
+  - Applied React context best practices from complexity analysis
   - Added context debugging and error recovery
   - Updated auth state management patterns"
 
   # ✅ DO: Progress commits during development
-  git commit -m "wip(components): add envelope summary card structure - Task #23"
+  git commit -m "wip(components): add envelope summary card structure - Task #23
+
+  - Implementing shadcn/ui patterns identified in research
+  - Following established component architecture"
+
+  # ✅ DO: Reference subtask research
+  git commit -m "feat(forms): implement envelope form validation - Task #23.2
+
+  - Applied Zod validation patterns from codebase research
+  - Integrated with established form state management"
 
   # ❌ DON'T: Vague commits without task reference
   git commit -m "fix stuff"
+  
+  # ❌ DON'T: Start tasks without research
+  git checkout -b task/15-fix-auth-context  # No prior analysis
   ```
 
+- **Research-Informed Development Process**
+  - Use complexity analysis to understand task scope before starting
+  - Reference research findings when making implementation decisions
+  - Apply discovered patterns and best practices from analysis
+  - Document deviations from research recommendations in commits
+
 - **Task Completion Workflow**
-  - Make final commit summarizing completion
+  - **For Subtasks**: Continue automatically without user confirmation
+  - **For Full Parent Tasks**: ALWAYS pause for user review before completion
+  - Make final commit summarizing completion and research application
+  - Verify all research-identified requirements were addressed
   - Mark task done in Task Master: `task-master set-status --id=<id> --status=done`
   - Merge to main and clean up branch
   - Get next task: `task-master next`
 
-- **Complete Example Workflow**
+- **Complete Example Workflow with Research-First**
   ```bash
-  # 1. Select and start task
-  task-master next
-  git checkout -b task/15-fix-auth-context
-
-  # 2. Work and commit progress
-  git add .
-  git commit -m "feat(auth): investigate context loss issue - Task #15"
+  # 0. REQUIRED: Research before starting any work
+  task-master analyze-complexity --research
+  task-master complexity-report
+  # Review: Task 15 has complexity 8, needs auth context investigation
   
-  # 3. Continue development
+  # 1. Expand if needed, then select and start task
+  task-master expand --id=15 --research --force
+  task-master next  # Selects task 15.1 (first subtask)
+  git checkout -b task/15.1-investigate-auth-context
+
+  # 2. Work and commit progress with research context
   git add .
-  git commit -m "fix(auth): implement context recovery logic - Task #15"
+  git commit -m "feat(auth): investigate context loss issue - Task #15.1
+
+  - Researched React context patterns and Next.js auth state
+  - Identified useUser hook as potential source of context loss
+  - Added debugging to understand navigation impact"
+  
+  # 3. Continue development applying research insights
+  git add .
+  git commit -m "fix(auth): implement context recovery logic - Task #15.1
+
+  - Applied React context persistence patterns from research
+  - Implemented session state recovery without page refresh
+  - Added error boundaries based on best practices"
 
   # 4. Complete task
   git add .
-  git commit -m "complete: Task #15 auth context fix ready for testing"
+  git commit -m "complete: Task #15.1 auth context investigation complete
+
+  - All research-identified issues addressed
+  - Context now persists across navigation
+  - Ready for testing and integration"
   
-  # 5. Mark done and merge
-  task-master set-status --id=15 --status=done
+  # 5. Mark done and merge (PARENT TASK REQUIRES USER REVIEW)
+  # For subtasks: Continue automatically
+  # For parent tasks: Pause and ask user to review completion
+  
+  # If this is a subtask (e.g., 15.1):
+  task-master set-status --id=15.1 --status=done
   git checkout main
+  git merge task/15.1-investigate-auth-context
+  git branch -d task/15.1-investigate-auth-context
+  git push origin main
+
+  # If this is a parent task (e.g., 15):
+  # Claude should pause and ask: "This completes Task #15. Let me summarize what we accomplished: [summary]. Please review - are you satisfied with this completion?"
+  # Only after user confirmation:
+  task-master set-status --id=15 --status=done
+  git checkout main  
   git merge task/15-fix-auth-context
   git branch -d task/15-fix-auth-context
   git push origin main
 
-  # 6. Next task
+  # 6. Next subtask or task
   task-master next
   ```
 
-- **Claude AI Integration**
-  - Always suggest creating branch when starting task work
-  - Remind about frequent commits during development
-  - Guide through completion workflow when task is done
-  - Reference task IDs in all code discussions
+- **Claude AI Integration with Research-First**
+  - **Subtask Flow**: Continue automatically through subtask implementation without asking for permission to proceed
+  - **Parent Task Review**: ALWAYS pause before completing full parent tasks and ask user to review:
+    - "This completes the full task [Task Name]. Let me summarize what we accomplished:"
+    - List all completed subtasks and their outcomes
+    - Highlight any deviations from original research or plan
+    - Ask: "Please review this summary. Are you satisfied with the completion, or should we address anything else before marking this task as done?"
+  - Always suggest complexity analysis before starting any task
+  - Remind about research requirements when task selection occurs
+  - Reference research findings when suggesting implementation approaches
+  - Guide through research-informed development workflow
+  - Help interpret complexity reports and apply insights
 
 - **Branch Management Best Practices**
-  - Keep branches small and focused (1 task = 1 branch)
+  - Keep branches small and focused (1 task/subtask = 1 branch)
   - Delete merged branches immediately
   - Never work directly on main branch
   - Use descriptive branch names that match task content
+  - Include subtask numbers for clarity (e.g., `task/15.2-fix-context-hook`)
 
-- **Commit Types Reference**
+- **Task Completion Review Requirements**
+  - **Subtasks (e.g., 15.1, 15.2)**: Complete automatically without user confirmation
+  - **Parent Tasks (e.g., 15, 23, 31)**: MANDATORY user review before completion
+  - **Parent Task Review Process**:
+    1. Summarize all completed subtasks and their outcomes
+    2. List key accomplishments and any deviations from original plan
+    3. Highlight any remaining considerations or follow-up items
+    4. Ask explicit confirmation: "Please review this completion summary. Are you satisfied with the results, or should we address anything else before marking this task as done?"
+    5. Only proceed with `task-master set-status --id=<id> --status=done` after user approval
+  - **Quality Assurance**: Ensure all acceptance criteria from research phase were met
+
+- **Research Integration Benefits**
+  - Better understanding of task scope before starting
+  - More accurate time estimation
+  - Higher quality implementation following established patterns
+  - Reduced rework from missing requirements
+  - Better alignment with existing codebase architecture
   - `feat`: New features or major functionality
   - `fix`: Bug fixes and corrections  
   - `refactor`: Code improvements without behavior change
@@ -114,28 +210,36 @@ alwaysApply: true
   - `chore`: Build, config, or tooling changes
   - `wip`: Work in progress (use sparingly)
   - `complete`: Final commit marking task completion
+  - `research`: Commits focused on investigation and analysis
 
 - **Integration with @dev_workflow.mdc**
-  - This Git workflow complements the Task Master AI workflow
-  - Use together for complete task-driven development
-  - Git branches map to Task Master AI task contexts
-  - Both systems work together for organized development
+  - This Git workflow enforces the research-first approach from dev workflow
+  - Combines Task Master AI research capabilities with Git branch management
+  - Git branches map to research-informed Task Master AI task contexts
+  - Both systems work together for organized, well-researched development
+
+- **Research Quality Indicators in Git History**
+  - Commit messages reference specific research findings
+  - Implementation decisions explained with research context
+  - Patterns and best practices applied from analysis
+  - Clear traceability from research to implementation choices
 
 - **Error Recovery**
   - If context is lost: `git status` to check current branch
   - If unsure which task: `task-master list` to see active tasks
+  - If research is missing: Run `task-master complexity-report` to review analysis
   - If branch conflicts: Use task ID to identify correct branch
-  - If merge issues: Reference task details for resolution guidance
+  - If implementation differs from research: Document reasoning in commit message
 
 - **Team Collaboration Benefits**
-  - Clear history linking code changes to specific requirements
+  - Clear history linking code changes to specific requirements AND research
   - Easy rollback of specific task implementations
-  - Isolated changes for better code review
+  - Isolated changes for better code review with research context
   - Parallel development without conflicts
-  - Traceability from git commits to task management
+  - Traceability from git commits to task management AND complexity analysis
 
-- **Mobile/Quick Development**
-  - For quick fixes: Still create branch but use shorter names
-  - For experiments: Use `task/<id>-experiment-<description>`
-  - For hotfixes: Use `hotfix/<description>` and update tasks afterward
-  - Always reference task IDs even for quick changes
+- **Mobile/Quick Development with Research**
+  - For quick fixes: Still run basic complexity check if time permits
+  - For experiments: Use `task/<id>-experiment-<description>` but document research gaps
+  - For hotfixes: Use `hotfix/<description>` and plan retroactive analysis
+  - Always reference task IDs and note when research was skipped

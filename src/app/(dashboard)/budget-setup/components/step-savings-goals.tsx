@@ -1,42 +1,38 @@
 "use client";
 
-import React, { forwardRef, useImperativeHandle } from "react";
-import { useState } from "react";
+import React, { forwardRef, useImperativeHandle, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Switch } from "@/components/ui/switch";
-import { format } from "date-fns";
 import {
-  useBudgetSetup,
-  BudgetSavingsGoalsStep,
-} from "../budget-setup-context";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useBudgetSetup, SavingsGoal } from "../budget-setup-context";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SavingsGoalSummaryCard } from "./savings-goal-summary-card";
 
-const savingsGoalSchema = z.object({
-  goals: z
-    .array(
-      z.object({
-        name: z.string().min(1, "Name is required"),
-        targetAmount: z.number().min(0, "Target amount must be positive"),
-        currentAmount: z.number().min(0, "Current amount must be positive"),
-        defaultContribution: z
-          .number()
-          .min(0, "Default contribution must be positive"),
-        isEmergencyFund: z.boolean(),
-        isRoundupTarget: z.boolean(),
-      })
-    )
-    .min(1, "At least one savings goal is required"),
+const singleSavingsGoalSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  targetAmount: z.number().min(0, "Target amount must be positive"),
+  currentAmount: z.number().min(0, "Current amount must be positive"),
+  defaultContribution: z
+    .number()
+    .min(0, "Default contribution must be positive"),
+  isEmergencyFund: z.boolean(),
+  isRoundupTarget: z.boolean(),
+  targetDate: z.string().optional(),
 });
 
-type SavingsGoalFormData = z.infer<typeof savingsGoalSchema>;
+type SavingsGoalFormData = z.infer<typeof singleSavingsGoalSchema>;
 
 interface StepSavingsGoalsProps {
   householdId: string;
@@ -47,231 +43,192 @@ const StepSavingsGoals = forwardRef(function StepSavingsGoals(
   { householdId, onComplete }: StepSavingsGoalsProps,
   ref
 ) {
-  const { getStepData, setStepData } = useBudgetSetup();
+  const { getStepData, addSavingsGoal, updateSavingsGoal, removeSavingsGoal } =
+    useBudgetSetup();
   const existingData = getStepData("savingsGoals");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const goals = existingData?.goals || [];
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
 
   const form = useForm<SavingsGoalFormData>({
-    resolver: zodResolver(savingsGoalSchema),
-    defaultValues: existingData || {
-      goals: [
-        {
-          name: "",
-          targetAmount: 0,
-          currentAmount: 0,
-          defaultContribution: 0,
-          isEmergencyFund: false,
-          isRoundupTarget: false,
-        },
-      ],
-    },
+    resolver: zodResolver(singleSavingsGoalSchema),
   });
 
+  const handleEdit = (goal: SavingsGoal) => {
+    setEditingGoal(goal);
+    form.reset(goal);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    removeSavingsGoal(id);
+    toast.success("Savings goal removed");
+  };
+
+  const handleAddNew = () => {
+    setEditingGoal(null);
+    form.reset({
+      name: "",
+      targetAmount: 0,
+      currentAmount: 0,
+      defaultContribution: 0,
+      isEmergencyFund: false,
+      isRoundupTarget: false,
+    });
+    setIsDialogOpen(true);
+  };
+
   const onSubmit = async (data: SavingsGoalFormData) => {
-    try {
-      setIsSubmitting(true);
-      // Save to context
-      setStepData("savingsGoals", data);
-
-      // Save to API
-      const response = await fetch("/api/budget-setup/savings-goals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save savings goals");
-      }
-
-      onComplete();
-    } catch (error) {
-      toast.error("Failed to save savings goals. Please try again.");
-      console.error("Error saving savings goals:", error);
-    } finally {
-      setIsSubmitting(false);
+    if (editingGoal) {
+      updateSavingsGoal(editingGoal.id, data);
+      toast.success("Savings goal updated");
+    } else {
+      addSavingsGoal(data);
+      toast.success("Savings goal added");
     }
-  };
-
-  const addGoal = () => {
-    const currentGoals = form.getValues("goals");
-    form.setValue("goals", [
-      ...currentGoals,
-      {
-        name: "",
-        targetAmount: 0,
-        currentAmount: 0,
-        defaultContribution: 0,
-        isEmergencyFund: false,
-        isRoundupTarget: false,
-      },
-    ]);
-  };
-
-  const removeGoal = (index: number) => {
-    const currentGoals = form.getValues("goals");
-    form.setValue(
-      "goals",
-      currentGoals.filter((_, i) => i !== index)
-    );
+    setIsDialogOpen(false);
+    setEditingGoal(null);
   };
 
   useImperativeHandle(ref, () => ({
-    submit: () => form.handleSubmit(onSubmit)(),
+    submit: () => {
+      // Since we save on each action, we can just call onComplete
+      onComplete();
+    },
   }));
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Savings Goals</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addGoal}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Goal
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Savings Goals</h2>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddNew}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Add Goal
+        </Button>
+      </div>
 
-        {form.watch("goals").map((_, index) => (
-          <div key={index} className="grid gap-4 p-4 border rounded-lg">
-            <div className="flex justify-between items-start">
-              <h3 className="font-medium">Goal #{index + 1}</h3>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeGoal(index)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+      <div className="space-y-4">
+        {goals.map((goal) => (
+          <SavingsGoalSummaryCard
+            key={goal.id}
+            goal={goal}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingGoal ? "Edit Savings Goal" : "Add New Savings Goal"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                {...form.register("name")}
+                placeholder="e.g., Emergency Fund"
+              />
+              {form.formState.errors.name && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.name.message}
+                </p>
+              )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor={`goals.${index}.name`}>Name</Label>
+                <Label htmlFor="targetAmount">Target Amount</Label>
                 <Input
-                  id={`goals.${index}.name`}
-                  {...form.register(`goals.${index}.name`)}
-                  placeholder="e.g., Emergency Fund"
-                />
-                {form.formState.errors.goals?.[index]?.name && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.goals[index]?.name?.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={`goals.${index}.targetAmount`}>
-                  Target Amount
-                </Label>
-                <Input
-                  id={`goals.${index}.targetAmount`}
+                  id="targetAmount"
                   type="number"
                   step="0.01"
-                  {...form.register(`goals.${index}.targetAmount`, {
-                    valueAsNumber: true,
-                  })}
+                  {...form.register("targetAmount", { valueAsNumber: true })}
                 />
-                {form.formState.errors.goals?.[index]?.targetAmount && (
+                {form.formState.errors.targetAmount && (
                   <p className="text-sm text-destructive">
-                    {form.formState.errors.goals[index]?.targetAmount?.message}
+                    {form.formState.errors.targetAmount.message}
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor={`goals.${index}.currentAmount`}>
-                  Current Amount
-                </Label>
+                <Label htmlFor="currentAmount">Current Amount</Label>
                 <Input
-                  id={`goals.${index}.currentAmount`}
+                  id="currentAmount"
                   type="number"
                   step="0.01"
-                  {...form.register(`goals.${index}.currentAmount`, {
-                    valueAsNumber: true,
-                  })}
+                  {...form.register("currentAmount", { valueAsNumber: true })}
                 />
-                {form.formState.errors.goals?.[index]?.currentAmount && (
+                {form.formState.errors.currentAmount && (
                   <p className="text-sm text-destructive">
-                    {form.formState.errors.goals[index]?.currentAmount?.message}
+                    {form.formState.errors.currentAmount.message}
                   </p>
                 )}
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor={`goals.${index}.defaultContribution`}>
+                <Label htmlFor="defaultContribution">
                   Default Contribution
                 </Label>
                 <Input
-                  id={`goals.${index}.defaultContribution`}
+                  id="defaultContribution"
                   type="number"
                   step="0.01"
-                  {...form.register(`goals.${index}.defaultContribution`, {
+                  {...form.register("defaultContribution", {
                     valueAsNumber: true,
                   })}
                 />
-                {form.formState.errors.goals?.[index]?.defaultContribution && (
+                {form.formState.errors.defaultContribution && (
                   <p className="text-sm text-destructive">
-                    {
-                      form.formState.errors.goals[index]?.defaultContribution
-                        ?.message
-                    }
+                    {form.formState.errors.defaultContribution.message}
                   </p>
                 )}
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`goals.${index}.isEmergencyFund`}
-                    checked={form.watch(`goals.${index}.isEmergencyFund`)}
-                    onCheckedChange={(checked) =>
-                      form.setValue(
-                        `goals.${index}.isEmergencyFund`,
-                        checked as boolean
-                      )
-                    }
-                  />
-                  <Label htmlFor={`goals.${index}.isEmergencyFund`}>
-                    Emergency Fund
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`goals.${index}.isRoundupTarget`}
-                    checked={form.watch(`goals.${index}.isRoundupTarget`)}
-                    onCheckedChange={(checked) =>
-                      form.setValue(
-                        `goals.${index}.isRoundupTarget`,
-                        checked as boolean
-                      )
-                    }
-                  />
-                  <Label htmlFor={`goals.${index}.isRoundupTarget`}>
-                    Roundup Target
-                  </Label>
-                </div>
-              </div>
             </div>
-          </div>
-        ))}
 
-        {form.formState.errors.goals &&
-          !Array.isArray(form.formState.errors.goals) && (
-            <p className="text-sm text-destructive">
-              {form.formState.errors.goals.message}
-            </p>
-          )}
-      </div>
-    </form>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isEmergencyFund"
+                {...form.register("isEmergencyFund")}
+              />
+              <Label htmlFor="isEmergencyFund">
+                Is this an emergency fund?
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isRoundupTarget"
+                {...form.register("isRoundupTarget")}
+              />
+              <Label htmlFor="isRoundupTarget">Use for round-ups?</Label>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingGoal ? "Save Changes" : "Add Goal"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 });
 
