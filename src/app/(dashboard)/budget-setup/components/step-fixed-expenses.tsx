@@ -82,22 +82,22 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
     error: userError,
   } = useUser();
 
-  // Initialize state with data from context
-  const [state, setState] = useState<FixedExpenseFormState>(() => {
-    const existingData = getStepData("fixedExpenses");
-    return {
-      expenses: existingData?.expenses || [],
-      editingExpense: null,
-      addingNewExpense: !existingData?.expenses?.length,
-      loading: false,
-      saving: false,
-    };
-  });
+  // Split state into multiple hooks for more granular updates
+  const [expenses, setExpenses] = useState<FixedExpenseType[]>(
+    () => getStepData("fixedExpenses")?.expenses || []
+  );
+  const [editingExpense, setEditingExpense] = useState<string | null>(null);
+  const [addingNewExpense, setAddingNewExpense] = useState(
+    () => !getStepData("fixedExpenses")?.expenses?.length
+  );
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const hasAttemptedLoad = useRef(false);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
-    count: state.expenses.length,
+    count: expenses.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 120, // Adjusted for better spacing
     overscan: 5,
@@ -105,9 +105,9 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
   // IMPORTANT: All hooks must be called before any early returns!
   // Memoize the update function to prevent unnecessary re-renders
   const updateStepData = useCallback(
-    (expenses: FixedExpenseType[]) => {
+    (newExpenses: FixedExpenseType[]) => {
       setStepData("fixedExpenses", {
-        expenses: expenses.map(mapToFixedExpense),
+        expenses: newExpenses.map(mapToFixedExpense),
       });
     },
     [setStepData]
@@ -122,7 +122,7 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       }
 
       // Check if we already have data in state
-      if (state.expenses.length > 0) {
+      if (expenses.length > 0) {
         hasAttemptedLoad.current = true;
         return;
       }
@@ -130,18 +130,15 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       // Check context for data first
       const existingData = getStepData("fixedExpenses");
       if (existingData?.expenses && existingData.expenses.length > 0) {
-        setState((prev) => ({
-          ...prev,
-          expenses: existingData.expenses,
-          addingNewExpense: false,
-        }));
+        setExpenses(existingData.expenses);
+        setAddingNewExpense(false);
         hasAttemptedLoad.current = true;
         return;
       }
 
       try {
         hasAttemptedLoad.current = true;
-        setState((prev) => ({ ...prev, loading: true }));
+        setLoading(true);
 
         const response = await fetch(
           `/api/budget-setup/fixed-expenses?householdId=${userHouseholdId}`
@@ -151,33 +148,30 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
           throw new Error("Failed to load fixed expenses");
         }
 
-        const { expenses } = await response.json();
+        const { expenses: loadedExpenses } = await response.json();
 
         // Update both state and context
-        setState((prev) => ({
-          ...prev,
-          expenses: expenses || [],
-          loading: false,
-          addingNewExpense: !expenses?.length,
-        }));
+        setExpenses(loadedExpenses || []);
+        setLoading(false);
+        setAddingNewExpense(!loadedExpenses?.length);
 
         // Only update context if we have new data
-        if (expenses && expenses.length > 0) {
-          updateStepData(expenses);
+        if (loadedExpenses && loadedExpenses.length > 0) {
+          updateStepData(loadedExpenses);
         }
       } catch (error) {
         console.error("Error loading fixed expenses:", error);
         toast.error("Failed to load fixed expenses");
-        setState((prev) => ({ ...prev, loading: false }));
+        setLoading(false);
       }
     };
 
     loadFixedExpenses();
-  }, [userHouseholdId, updateStepData, getStepData]); // Clean dependency array
+  }, [userHouseholdId, updateStepData, getStepData, expenses.length]);
 
   useImperativeHandle(ref, () => ({
     submit: async () => {
-      if (state.expenses.length === 0) {
+      if (expenses.length === 0) {
         toast.error("Please add at least one fixed expense before continuing");
         return;
       }
@@ -222,19 +216,13 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
   }
 
   const handleAddExpense = () => {
-    setState((prev) => ({
-      ...prev,
-      addingNewExpense: true,
-      editingExpense: null,
-    }));
+    setAddingNewExpense(true);
+    setEditingExpense(null);
   };
 
   const handleEditExpense = (expense: FixedExpenseType) => {
-    setState((prev) => ({
-      ...prev,
-      editingExpense: expense.id,
-      addingNewExpense: false,
-    }));
+    setEditingExpense(expense.id);
+    setAddingNewExpense(false);
   };
 
   const handleDeleteExpense = useCallback(
@@ -251,13 +239,10 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
           throw new Error("Failed to delete expense");
         }
 
-        const updatedExpenses = state.expenses.filter(
+        const updatedExpenses = expenses.filter(
           (expense) => expense.id !== expenseId
         );
-        setState((prev) => ({
-          ...prev,
-          expenses: updatedExpenses,
-        }));
+        setExpenses(updatedExpenses);
         updateStepData(updatedExpenses);
         toast.success("Expense deleted successfully");
       } catch (error) {
@@ -265,21 +250,18 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
         toast.error("Failed to delete expense");
       }
     },
-    [userHouseholdId, state.expenses, updateStepData]
+    [userHouseholdId, expenses, updateStepData]
   );
 
   const handleSaveExpense = useCallback(
     async (formData: any) => {
-      setState((prev) => ({ ...prev, saving: true }));
+      setSaving(true);
+      const isEditing = !!editingExpense;
 
       try {
-        const isEditing = !!state.editingExpense;
-        const expenseData = { ...formData, id: state.editingExpense };
-        delete expenseData.householdId;
-
         const payload = {
           householdId,
-          expenses: [expenseData],
+          expenses: [formData],
         };
 
         const response = await fetch(`/api/budget-setup/fixed-expenses`, {
@@ -295,19 +277,19 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
 
         const savedExpense = await response.json();
 
-        const updatedExpenses = isEditing
-          ? state.expenses.map((expense) =>
-              expense.id === state.editingExpense ? savedExpense : expense
-            )
-          : [...state.expenses, savedExpense];
+        let updatedExpenses;
+        if (isEditing) {
+          updatedExpenses = expenses.map((exp) =>
+            exp.id === savedExpense.id ? savedExpense : exp
+          );
+        } else {
+          updatedExpenses = [...expenses, savedExpense];
+        }
 
-        setState((prev) => ({
-          ...prev,
-          expenses: updatedExpenses,
-          editingExpense: null,
-          addingNewExpense: false,
-          saving: false,
-        }));
+        setExpenses(updatedExpenses);
+        setEditingExpense(null);
+        setAddingNewExpense(false);
+        setSaving(false);
 
         updateStepData(updatedExpenses);
         toast.success(
@@ -316,36 +298,33 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
       } catch (error) {
         console.error("Error saving expense:", error);
         toast.error(
-          error instanceof Error ? error.message : "Failed to save expense"
+          error instanceof Error ? error.message : "An error occurred"
         );
-        setState((prev) => ({ ...prev, saving: false }));
+        setSaving(false);
       }
     },
-    [householdId, state.editingExpense, state.expenses, updateStepData]
+    [userHouseholdId, expenses, editingExpense, updateStepData]
   );
 
   const handleCancelForm = () => {
-    setState((prev) => ({
-      ...prev,
-      editingExpense: null,
-      addingNewExpense: false,
-    }));
+    setEditingExpense(null);
+    setAddingNewExpense(false);
   };
 
-  const currentExpense = state.editingExpense
-    ? state.expenses.find((expense) => expense.id === state.editingExpense)
+  const currentExpense = editingExpense
+    ? expenses.find((exp) => exp.id === editingExpense)
     : undefined;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold">Fixed Expenses</h3>
-        {!state.addingNewExpense && !state.editingExpense && (
+        {!addingNewExpense && !editingExpense && (
           <Button
             size="sm"
             variant="outline"
             onClick={handleAddExpense}
-            disabled={state.saving}
+            disabled={saving}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Expense
@@ -353,24 +332,22 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
         )}
       </div>
 
-      {state.loading && state.expenses.length === 0 ? (
+      {loading && expenses.length === 0 ? (
         <div className="flex items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       ) : null}
 
-      {!state.loading &&
-        state.expenses.length === 0 &&
-        !state.addingNewExpense && (
-          <Card className="p-6 text-center text-gray-500">
-            <p>No fixed expenses added yet.</p>
-            <Button className="mt-4" size="sm" onClick={handleAddExpense}>
-              Add First Expense
-            </Button>
-          </Card>
-        )}
+      {!loading && expenses.length === 0 && !addingNewExpense && (
+        <Card className="p-6 text-center text-gray-500">
+          <p>No fixed expenses added yet.</p>
+          <Button className="mt-4" size="sm" onClick={handleAddExpense}>
+            Add First Expense
+          </Button>
+        </Card>
+      )}
 
-      {state.expenses.length > 0 && (
+      {expenses.length > 0 && (
         <div
           ref={parentRef}
           className="h-[450px] overflow-y-auto rounded-lg border bg-gray-50/50 p-2 space-y-2"
@@ -383,7 +360,7 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
             }}
           >
             {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-              const expense = state.expenses[virtualItem.index];
+              const expense = expenses[virtualItem.index];
               return (
                 <div
                   key={virtualItem.key}
@@ -408,7 +385,7 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
         </div>
       )}
 
-      {(state.addingNewExpense || state.editingExpense) && (
+      {(addingNewExpense || editingExpense) && (
         <Suspense
           fallback={
             <div className="flex items-center justify-center p-8">
@@ -420,7 +397,7 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
             expense={currentExpense}
             onSave={handleSaveExpense}
             onCancel={handleCancelForm}
-            saving={state.saving}
+            saving={saving}
           />
         </Suspense>
       )}
