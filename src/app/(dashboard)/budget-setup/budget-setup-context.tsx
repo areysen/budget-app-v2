@@ -50,13 +50,14 @@ export interface BudgetFixedExpensesStep {
   expenses: FixedExpense[];
 }
 
-export interface Envelope {
+export type Envelope = {
   id: string;
   name: string;
   amount: number;
-  rolloverRule: "always_rollover" | "rollover_limit" | "always_to_savings";
-  rolloverLimit?: number;
-}
+  rolloverRule: "rollover" | "rollover_limit" | "save";
+  rolloverLimit?: number | null;
+};
+
 export interface BudgetEnvelopesStep {
   envelopes: Envelope[];
 }

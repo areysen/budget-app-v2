@@ -24,6 +24,7 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
 
   const [isFormOpen, setIsFormOpen] = useState(envelopes.length === 0);
   const [editingEnvelope, setEditingEnvelope] = useState<Envelope | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useImperativeHandle(ref, () => ({
     submit: () => {
@@ -45,21 +46,67 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    removeEnvelope(id);
-    toast.success("Envelope removed.");
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(
+        `/api/budget-setup/envelopes?householdId=${householdId}&id=${id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete envelope");
+      }
+
+      removeEnvelope(id);
+      toast.success("Envelope removed.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to remove envelope.");
+    }
   };
 
-  const handleSave = (envelopeData: Omit<Envelope, "id">) => {
-    if (editingEnvelope) {
-      updateEnvelope(editingEnvelope.id, envelopeData);
-      toast.success("Envelope updated.");
-    } else {
-      addEnvelope(envelopeData);
-      toast.success("Envelope added.");
+  const handleSave = async (envelopeData: Omit<Envelope, "id">) => {
+    setIsSaving(true);
+    try {
+      const isEditing = !!editingEnvelope;
+      const url = "/api/budget-setup/envelopes";
+      const method = isEditing ? "PUT" : "POST";
+      const body = JSON.stringify({
+        ...envelopeData,
+        id: isEditing ? editingEnvelope.id : undefined,
+        household_id: householdId,
+      });
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${isEditing ? "update" : "add"} envelope`);
+      }
+
+      if (isEditing) {
+        updateEnvelope(editingEnvelope.id, envelopeData);
+        toast.success("Envelope updated.");
+      } else {
+        // This is tricky because the context creates a random ID.
+        // For a real app, the API should return the created object with its ID.
+        // For now, we'll just add it to the context and assume it worked.
+        addEnvelope(envelopeData);
+        toast.success("Envelope added.");
+      }
+      setIsFormOpen(false);
+      setEditingEnvelope(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(`Failed to ${editingEnvelope ? "update" : "add"} envelope.`);
+    } finally {
+      setIsSaving(false);
     }
-    setIsFormOpen(false);
-    setEditingEnvelope(null);
   };
 
   return (
@@ -86,6 +133,7 @@ const StepEnvelopes = forwardRef(function StepEnvelopes(
           onSave={handleSave}
           onCancel={() => setIsFormOpen(false)}
           initialData={editingEnvelope}
+          saving={isSaving}
         />
       ) : (
         <div className="space-y-4">

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils/currency";
 import { Envelope } from "../budget-setup-context";
 
@@ -14,16 +14,15 @@ export function EnvelopeSummaryCard({
   onEdit,
   onDelete,
 }: EnvelopeSummaryCardProps) {
-  // Format rollover rule for display
   const getRolloverText = () => {
     switch (envelope.rolloverRule) {
-      case "always_rollover":
+      case "rollover":
         return "Always rolls over";
       case "rollover_limit":
         return `Rolls over up to ${formatCurrency(
           envelope.rolloverLimit || 0
         )}`;
-      case "always_to_savings":
+      case "save":
         return "Excess goes to savings";
       default:
         return "";
@@ -31,24 +30,29 @@ export function EnvelopeSummaryCard({
   };
 
   return (
-    <Card className="p-4 mb-4">
-      <div className="flex justify-between items-center">
+    <Card>
+      <CardContent className="p-4 flex justify-between items-center">
         <div>
-          <h3 className="font-medium">{envelope.name}</h3>
+          <p className="font-semibold">{envelope.name}</p>
           <p className="text-sm text-muted-foreground">
             {formatCurrency(envelope.amount)} per period
           </p>
           <p className="text-xs text-muted-foreground">{getRolloverText()}</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onEdit}>
+          <Button variant="ghost" size="sm" onClick={onEdit}>
             Edit
           </Button>
-          <Button size="sm" variant="destructive" onClick={onDelete}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            className="text-red-500 hover:text-red-600"
+          >
             Delete
           </Button>
         </div>
-      </div>
+      </CardContent>
     </Card>
   );
 }

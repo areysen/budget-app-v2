@@ -23,24 +23,19 @@ import { Loader2 } from "lucide-react";
 import { Envelope } from "../budget-setup-context";
 
 // Validation schema
-const envelopeSchema = z.object({
-  id: z.string().optional(),
+const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
-  rolloverRule: z.enum([
-    "always_rollover",
-    "rollover_limit",
-    "always_to_savings",
-  ]),
-  rolloverLimit: z.coerce.number().positive().optional(),
+  amount: z.coerce.number().min(0, "Amount must be positive"),
+  rolloverRule: z.enum(["rollover", "rollover_limit", "save"]),
+  rolloverLimit: z.coerce.number().optional().nullable(),
 });
 
-type EnvelopeFormValues = z.infer<typeof envelopeSchema>;
+type EnvelopeFormValues = z.infer<typeof formSchema>;
 
 interface EnvelopeFormProps {
-  initialData?: Envelope | null;
   householdId: string;
-  onSave: (envelope: Omit<Envelope, "id">) => void;
+  initialData?: Envelope;
+  onSave: (data: Envelope) => void;
   onCancel: () => void;
   saving?: boolean;
 }
@@ -52,31 +47,28 @@ export function EnvelopeForm({
   onCancel,
   saving,
 }: EnvelopeFormProps) {
-  // Default values
-  const defaultValues: Partial<EnvelopeFormValues> = {
-    name: initialData?.name || "",
-    amount: initialData?.amount || 0,
-    rolloverRule: initialData?.rolloverRule || "always_rollover",
-    rolloverLimit: initialData?.rolloverLimit,
-    ...(initialData?.id && { id: initialData.id }),
-  };
-
   const form = useForm<EnvelopeFormValues>({
-    resolver: zodResolver(envelopeSchema),
-    defaultValues,
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: initialData?.name || "",
+      amount: initialData?.amount || 0,
+      rolloverRule: initialData?.rolloverRule || "rollover",
+      rolloverLimit: initialData?.rolloverLimit ?? undefined,
+    },
   });
 
   // Watch rollover rule to conditionally show rollover limit
-  const rolloverRule = form.watch("rolloverRule");
-  const showRolloverLimit = rolloverRule === "rollover_limit";
+  const watchRolloverRule = form.watch("rolloverRule");
+  const showRolloverLimit = watchRolloverRule === "rollover_limit";
 
   // Handle form submission
   const onSubmit = (values: EnvelopeFormValues) => {
-    if (values.rolloverRule !== "rollover_limit") {
-      values.rolloverLimit = undefined;
-    }
-    const { id, ...saveData } = values;
-    onSave(saveData);
+    onSave({
+      id: initialData?.id || "",
+      ...values,
+      rolloverLimit:
+        values.rolloverRule === "rollover_limit" ? values.rolloverLimit : null,
+    });
   };
 
   return (
@@ -123,30 +115,23 @@ export function EnvelopeForm({
             <FormItem>
               <FormLabel>Rollover Rule</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a rollover rule" />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a rule" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="always_rollover">
-                    Always Rollover
-                  </SelectItem>
+                  <SelectItem value="rollover">Always Rollover</SelectItem>
                   <SelectItem value="rollover_limit">
                     Rollover with Limit
                   </SelectItem>
-                  <SelectItem value="always_to_savings">
-                    Always to Savings
-                  </SelectItem>
+                  <SelectItem value="save">Rollover to Savings</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription>
-                {field.value === "always_rollover" &&
+                {field.value === "rollover" &&
                   "Unused funds always roll over to the next period"}
                 {field.value === "rollover_limit" &&
                   "Unused funds roll over up to a specified limit"}
-                {field.value === "always_to_savings" &&
-                  "Unused funds always go to savings"}
+                {field.value === "save" && "Unused funds always go to savings"}
               </FormDescription>
               <FormMessage />
             </FormItem>
