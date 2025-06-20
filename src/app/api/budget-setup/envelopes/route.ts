@@ -3,17 +3,77 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const envelopeSchema = z.object({
-  householdId: z.string(),
-  envelopes: z.array(
-    z.object({
-      name: z.string().min(1),
-      defaultAmount: z.number().min(0),
-      rolloverRule: z.enum(["save", "rollover", "rollover_limit"]),
-      rolloverLimit: z.number().optional(),
-      description: z.string().optional(),
-    })
-  ),
+  id: z.string().optional(),
+  name: z.string().min(1),
+  amount: z.number().min(0),
+  rolloverRule: z.enum(["rollover", "rollover_limit", "save"]),
+  rolloverLimit: z.number().optional().nullable(),
+  household_id: z.string(),
 });
+
+async function verifyUserAccess(supabase: any, householdId: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data: member } = await supabase
+    .from("household_members")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!member) {
+    throw new Error("User is not a member of this household");
+  }
+
+  return user;
+}
+
+export async function GET(request: Request) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { searchParams } = new URL(request.url);
+    const householdId = searchParams.get("householdId");
+
+    if (!householdId) {
+      return NextResponse.json(
+        { error: "Household ID is required" },
+        { status: 400 }
+      );
+    }
+
+    await verifyUserAccess(supabase, householdId);
+
+    const { data, error } = await supabase
+      .from("envelopes")
+      .select("id, name, default_amount, rollover_rule, rollover_limit")
+      .eq("household_id", householdId)
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) throw error;
+
+    return NextResponse.json(
+      data.map((e) => ({
+        id: e.id,
+        name: e.name,
+        amount: e.default_amount,
+        rolloverRule: e.rollover_rule,
+        rolloverLimit: e.rollover_limit,
+      }))
+    );
+  } catch (error: any) {
+    console.error("Error fetching envelopes:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch envelopes" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,50 +81,95 @@ export async function POST(request: Request) {
     const json = await request.json();
     const data = envelopeSchema.parse(json);
 
-    // Verify user has access to this household
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    await verifyUserAccess(supabase, data.household_id);
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { error } = await supabase.from("envelopes").insert({
+      household_id: data.household_id,
+      name: data.name,
+      default_amount: data.amount,
+      rollover_rule: data.rolloverRule,
+      rollover_limit: data.rolloverLimit,
+    });
 
-    const { data: member } = await supabase
-      .from("household_members")
-      .select("id")
-      .eq("household_id", data.householdId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!member) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Create envelopes
-    const { error: envelopesError } = await supabase.from("envelopes").insert(
-      data.envelopes.map((envelope, index) => ({
-        household_id: data.householdId,
-        name: envelope.name,
-        default_amount: envelope.defaultAmount,
-        rollover_rule: envelope.rolloverRule,
-        rollover_limit:
-          envelope.rolloverRule === "rollover_limit"
-            ? envelope.rolloverLimit
-            : null,
-        description: envelope.description || null,
-        is_active: true,
-        sort_order: index,
-      }))
-    );
-
-    if (envelopesError) throw envelopesError;
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error saving envelopes:", error);
+  } catch (error: any) {
+    console.error("Error creating envelope:", error);
     return NextResponse.json(
-      { error: "Failed to save envelopes" },
+      { error: error.message || "Failed to create envelope" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const json = await request.json();
+    const data = envelopeSchema.parse(json);
+
+    if (!data.id) {
+      return NextResponse.json(
+        { error: "Envelope ID is required for updates" },
+        { status: 400 }
+      );
+    }
+
+    await verifyUserAccess(supabase, data.household_id);
+
+    const { error } = await supabase
+      .from("envelopes")
+      .update({
+        name: data.name,
+        default_amount: data.amount,
+        rollover_rule: data.rolloverRule,
+        rollover_limit: data.rolloverLimit,
+      })
+      .eq("id", data.id)
+      .eq("household_id", data.household_id);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error updating envelope:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to update envelope" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { searchParams } = new URL(request.url);
+    const householdId = searchParams.get("householdId");
+    const id = searchParams.get("id");
+
+    if (!householdId || !id) {
+      return NextResponse.json(
+        { error: "Household ID and envelope ID are required" },
+        { status: 400 }
+      );
+    }
+
+    await verifyUserAccess(supabase, householdId);
+
+    const { error } = await supabase
+      .from("envelopes")
+      .delete()
+      .eq("id", id)
+      .eq("household_id", householdId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting envelope:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to delete envelope" },
       { status: 500 }
     );
   }

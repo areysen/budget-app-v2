@@ -20,64 +20,55 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { Envelope } from "../budget-setup-context";
 
 // Validation schema
-const envelopeSchema = z.object({
-  id: z.string().optional(),
+const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  default_amount: z.coerce.number().positive("Amount must be greater than 0"),
-  rollover_rule: z.enum([
-    "always_rollover",
-    "rollover_limit",
-    "always_to_savings",
-  ]),
-  rollover_limit: z.coerce.number().positive().optional().nullable(),
-  household_id: z.string(),
+  amount: z.coerce.number().min(0, "Amount must be positive"),
+  rolloverRule: z.enum(["rollover", "rollover_limit", "save"]),
+  rolloverLimit: z.coerce.number().optional().nullable(),
 });
 
-type EnvelopeFormValues = z.infer<typeof envelopeSchema>;
+type EnvelopeFormValues = z.infer<typeof formSchema>;
 
 interface EnvelopeFormProps {
-  envelope?: EnvelopeFormValues;
   householdId: string;
-  onSave: (envelope: EnvelopeFormValues) => void;
+  initialData?: Envelope;
+  onSave: (data: Envelope) => void;
   onCancel: () => void;
-  saving: boolean;
+  saving?: boolean;
 }
 
 export function EnvelopeForm({
-  envelope,
+  initialData,
   householdId,
   onSave,
   onCancel,
   saving,
 }: EnvelopeFormProps) {
-  // Default values
-  const defaultValues: Partial<EnvelopeFormValues> = {
-    name: "",
-    default_amount: 0,
-    rollover_rule: "always_rollover",
-    rollover_limit: null,
-    household_id: householdId,
-    ...envelope,
-  };
-
   const form = useForm<EnvelopeFormValues>({
-    resolver: zodResolver(envelopeSchema),
-    defaultValues,
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: initialData?.name || "",
+      amount: initialData?.amount || 0,
+      rolloverRule: initialData?.rolloverRule || "rollover",
+      rolloverLimit: initialData?.rolloverLimit ?? undefined,
+    },
   });
 
   // Watch rollover rule to conditionally show rollover limit
-  const rolloverRule = form.watch("rollover_rule");
-  const showRolloverLimit = rolloverRule === "rollover_limit";
+  const watchRolloverRule = form.watch("rolloverRule");
+  const showRolloverLimit = watchRolloverRule === "rollover_limit";
 
   // Handle form submission
   const onSubmit = (values: EnvelopeFormValues) => {
-    // If rollover rule is not rollover_limit, set limit to null
-    if (values.rollover_rule !== "rollover_limit") {
-      values.rollover_limit = null;
-    }
-    onSave(values);
+    onSave({
+      id: initialData?.id || "",
+      ...values,
+      rolloverLimit:
+        values.rolloverRule === "rollover_limit" ? values.rolloverLimit : null,
+    });
   };
 
   return (
@@ -102,7 +93,7 @@ export function EnvelopeForm({
 
         <FormField
           control={form.control}
-          name="default_amount"
+          name="amount"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Amount per Period</FormLabel>
@@ -119,35 +110,28 @@ export function EnvelopeForm({
 
         <FormField
           control={form.control}
-          name="rollover_rule"
+          name="rolloverRule"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rollover Rule</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a rollover rule" />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a rule" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="always_rollover">
-                    Always Rollover
-                  </SelectItem>
+                  <SelectItem value="rollover">Always Rollover</SelectItem>
                   <SelectItem value="rollover_limit">
                     Rollover with Limit
                   </SelectItem>
-                  <SelectItem value="always_to_savings">
-                    Always to Savings
-                  </SelectItem>
+                  <SelectItem value="save">Rollover to Savings</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription>
-                {field.value === "always_rollover" &&
+                {field.value === "rollover" &&
                   "Unused funds always roll over to the next period"}
                 {field.value === "rollover_limit" &&
                   "Unused funds roll over up to a specified limit"}
-                {field.value === "always_to_savings" &&
-                  "Unused funds always go to savings"}
+                {field.value === "save" && "Unused funds always go to savings"}
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -157,7 +141,7 @@ export function EnvelopeForm({
         {showRolloverLimit && (
           <FormField
             control={form.control}
-            name="rollover_limit"
+            name="rolloverLimit"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Rollover Limit</FormLabel>

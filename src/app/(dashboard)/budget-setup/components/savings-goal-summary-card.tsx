@@ -1,7 +1,9 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/currency";
 import { ShieldCheck } from "lucide-react";
 import { SavingsGoal } from "../budget-setup-context";
 

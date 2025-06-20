@@ -50,12 +50,14 @@ export interface BudgetFixedExpensesStep {
   expenses: FixedExpense[];
 }
 
-export interface Envelope {
+export type Envelope = {
+  id: string;
   name: string;
   amount: number;
-  rolloverRule: "always_rollover" | "rollover_limit" | "always_to_savings";
-  rolloverLimit?: number;
-}
+  rolloverRule: "rollover" | "rollover_limit" | "save";
+  rolloverLimit?: number | null;
+};
+
 export interface BudgetEnvelopesStep {
   envelopes: Envelope[];
 }
@@ -108,13 +110,10 @@ export type BudgetSetupContextType = {
   updateFixedExpense: (id: string, expense: FixedExpense) => void;
   addSavingsGoal: (goal: Omit<SavingsGoal, "id">) => void;
   removeSavingsGoal: (id: string) => void;
-  updateSavingsGoal: (
-    id: string,
-    goal: Partial<Omit<SavingsGoal, "id">>
-  ) => void;
-  addEnvelope: (envelope: Envelope) => void;
+  updateSavingsGoal: (id: string, goal: SavingsGoal) => void;
+  addEnvelope: (envelope: Omit<Envelope, "id">) => void;
   removeEnvelope: (id: string) => void;
-  updateEnvelope: (id: string, envelope: Envelope) => void;
+  updateEnvelope: (id: string, envelope: Partial<Omit<Envelope, "id">>) => void;
   reset: () => void;
 };
 
@@ -270,7 +269,10 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({
             ...prev,
             envelopes: {
-              envelopes: [...(prev.envelopes?.envelopes || []), envelope],
+              envelopes: [
+                ...(prev.envelopes?.envelopes || []),
+                { ...envelope, id: crypto.randomUUID() },
+              ],
             },
           }));
         },
@@ -280,9 +282,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
             return {
               ...prev,
               envelopes: {
-                envelopes: prev.envelopes.envelopes.filter(
-                  (e) => e.name !== id
-                ),
+                envelopes: prev.envelopes.envelopes.filter((e) => e.id !== id),
               },
             };
           });
@@ -294,7 +294,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
               ...prev,
               envelopes: {
                 envelopes: prev.envelopes.envelopes.map((e) =>
-                  e.name === id ? envelope : e
+                  e.id === id ? { ...e, ...envelope } : e
                 ),
               },
             };
