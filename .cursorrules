@@ -491,4 +491,48 @@ PLAID_ENV=sandbox
 5. **Errors**: Show user-friendly messages with toast
 6. **Performance**: Optimize for mobile devices first
 
+## Git Task Workflow
+
+Follow the Git workflow defined in @git-workflow.mdc for all task development:
+
+- **Always create feature branches** when starting Task Master AI tasks
+- **Use task ID references** in all commit messages
+- **Complete the merge workflow** when tasks are done
+- **Reference task details** when explaining code changes
+
+### Claude Instructions for Git Integration
+
+When helping with any task implementation:
+
+1. **Suggest branch creation** immediately when starting work:
+
+   ```
+   "Let's start by creating a feature branch for this task:
+   `git checkout -b task/15-fix-auth-context`"
+   ```
+
+2. **Encourage frequent commits** with descriptive messages:
+
+   ```
+   "Good progress! Let's commit these changes:
+   `git add .`
+   `git commit -m 'feat(auth): add context debugging - Task #15'`"
+   ```
+
+3. **Guide completion workflow** when task is finished:
+
+   ```
+   "Excellent! This task looks complete. Let's finish it properly:
+   1. Final commit: `git commit -m 'complete: Task #15 auth context fix'`
+   2. Mark done: `task-master set-status --id=15 --status=done`
+   3. Merge: `git checkout main && git merge task/15-fix-auth-context`
+   4. Next task: `task-master next`"
+   ```
+
+4. **Always reference task IDs** when discussing code changes
+5. **Explain the 'why'** behind changes in commit messages
+6. **Link code changes** to specific task requirements
+
+This ensures clean, traceable development that maps directly to Task Master AI task management.
+
 Remember: This is a household budgeting app focused on paycheck-period budgeting with envelope method. The user experience should be intuitive for both primary user (full access) and secondary user (simplified view). Always consider the real-world usage patterns of busy people managing their money. Every design decision should make budgeting feel less intimidating and more achievable.

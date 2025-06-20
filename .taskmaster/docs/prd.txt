@@ -1,185 +1,702 @@
-# Budget App v2 - Product Requirements Document
+<context>
+# Overview  
+Budget App v2 is a paycheck-period focused, zero-based budgeting application that solves the core problems of budget complexity and data model confusion. The app focuses on completing a robust, user-friendly budget setup flow where users configure their income sources, fixed expenses, spending envelopes, and savings goals in a consistent, polished interface.
 
-## Overview
+The target users are couples or households who receive semi-monthly paychecks and want to implement zero-based budgeting with the envelope method. The current focus is on perfecting the budget setup experience before building period management and transaction tracking features.
 
-Budget App v2 is a modern, paycheck-period focused zero-based budgeting application designed for household sharing. The app emphasizes a friendly, approachable interface to reduce financial anxiety while providing powerful budgeting tools through the envelope method.
+The product is valuable because it provides a clear, step-by-step setup process that eliminates confusion between spending categories (envelopes like groceries, household, fun money) and savings goals, with a consistent UI pattern that feels polished and professional.
 
-## Core Features
+# Core Features  
 
-### Authentication & Household Management
-- Supabase authentication with email/password
-- Household creation and member management
-- Primary and secondary user roles with appropriate permissions
-- Protected routes and secure data access
+## 1. Budget Setup Flow (CURRENT FOCUS)
+**What it does**: Four-step wizard that guides users through complete budget configuration
+**Why it's important**: Users cannot use the app until their budget is properly set up
+**How it works**:
+- Step 1: Income Sources (✅ COMPLETED - working great)
+- Step 2: Fixed Expenses (✅ FUNCTIONAL - needs performance optimization)  
+- Step 3: Envelopes (🔄 NEEDS MODERNIZATION - currently basic form arrays)
+- Step 4: Savings Goals (🔄 NEEDS MODERNIZATION - currently basic form arrays)
+- Navigation between steps with progress tracking
+- Data persistence across step navigation
 
-### Paycheck Period Management
-- Semi-monthly budget cycles (1st-14th and 15th-EOM)
-- Support for bi-weekly income sources
-- Automatic period creation with manual approval
-- Period status tracking and management
-- Conservative budgeting approach (secondary income not counted until received)
+## 2. Auth & Household Context System (🚨 CRITICAL ISSUE)
+**What it does**: Maintains user authentication and household membership throughout the app
+**Why it's important**: Users lose context when navigating away and must refresh page
+**Current Problem**: householdId context gets lost when user navigates away from budget setup and returns
+**How it should work**:
+- Persistent household context across page navigation
+- Reliable authentication state management
+- Graceful handling of context loss without requiring page refresh
 
-### Income Management
-- Multiple income source support
-- Primary and secondary income tracking
-- Frequency-based income calculations
-- Income source categorization
-- Period-specific income adjustments
+## 3. Envelope System (Definition Clarity Needed)
+**What it does**: Spending categories for day-to-day expenses using envelope budgeting method
+**Why it's important**: Core of zero-based budgeting - every discretionary dollar gets assigned
+**Envelope Categories Should Be**:
+- Groceries (food shopping)
+- Household (cleaning supplies, home maintenance)
+- Fun Money / Entertainment
+- Miscellaneous / Other
+- Personal Care
+- Dining Out
+- **NOT SoFi Vaults** - these are savings goals, not spending envelopes
+**How it works**:
+- Allocated amount per paycheck period
+- Rollover rules (always rollover, rollover to limit, always to savings)
+- Real-time balance tracking when spending occurs
 
-### Envelope System
-- Customizable spending categories
-- Configurable rollover rules (save, rollover, rollover_limit)
-- Envelope-to-envelope transfers
-- Overspending handling with transfer suggestions
-- Balance tracking (allocated vs. spent)
-- Visual progress indicators
+## 4. Enhanced Frequency System (✅ COMPLETED for Income/Expenses)
+**What it does**: Handles complex frequency patterns for recurring items
+**Why it's important**: Real life has irregular frequencies that don't fit simple monthly patterns
+**Current Status**: 
+- ✅ Working for income sources and fixed expenses
+- 🔄 NEEDS EXTENSION to envelopes and savings goals for consistency
+**How it works**:
+- Standard frequencies: weekly, bi-weekly, monthly, quarterly, annual
+- Custom frequencies: every N days/weeks/months with start dates
+- Smart allocation to paycheck periods
+- Prorated amounts when frequencies don't align
 
-### Fixed Expenses
-- Recurring bill management
-- Support for variable amounts
-- Due date tracking and notifications
-- Automatic period allocation
-- Payment status tracking
-- Bill categorization
+## 5. Summary Card + Form Pattern (✅ ESTABLISHED for Income/Expenses)
+**What it does**: Consistent UI pattern for managing lists of items
+**Why it's important**: Professional, polished user experience vs basic form arrays
+**How it works**:
+- Summary cards show existing items with key details
+- Edit/delete actions on each card
+- Dedicated form components for add/edit operations
+- When editing, summary cards disappear for clean editing experience
+- "Add New" button at top of section for easy access when many items exist
 
-### Savings Goals
-- Long-term savings target management
-- Emergency fund prioritization ($1000 minimum)
-- Multiple contribution types (planned, overflow, roundup)
-- Progress tracking and visualization
-- Goal-specific strategies
+# User Experience  
 
-### Transaction Management
-- Plaid integration for bank transaction imports
-- Manual transaction entry
-- AI-powered categorization suggestions
-- Required envelope assignment
-- Transaction approval workflow
-- Roundup calculations for savings
+## Current UX Issues to Resolve
 
-### AI-Powered Insights
-- Smart budget recommendations
-- Spending pattern analysis
-- Emergency fund strategies
-- Envelope transfer suggestions
-- Goal achievement coaching
-- Context-aware financial advice
+### 1. Auth/Context Stability (CRITICAL)
+**Current Problem**: User navigates away from budget setup, returns, householdId is missing, must refresh page
+**Target Experience**: Seamless navigation with persistent context
+**Success Criteria**: User can navigate away and return without losing household context
 
-## Technical Requirements
+### 2. Envelope Step Modernization (HIGH PRIORITY)
+**Current State**: Basic form array with add/remove buttons (old pattern)
+**Target State**: Summary cards + dedicated form component (match income/expense pattern)
+**Required Components**:
+- `EnvelopeSummaryCard` - displays envelope with amount and rollover rule
+- `EnvelopeForm` - dedicated add/edit form with validation
+- Updated `StepEnvelopes` - uses new pattern with proper state management
 
-### Frontend
-- Next.js 15 with App Router
-- TypeScript with strict typing
-- Tailwind CSS for styling
-- shadcn/ui component library
-- Mobile-first responsive design
-- Proper loading states and error boundaries
-- Optimistic updates for better UX
+### 3. Savings Goals Step Modernization (HIGH PRIORITY)
+**Current State**: Basic form array (old pattern)  
+**Target State**: Summary cards + dedicated form component
+**Required Components**:
+- `SavingsGoalSummaryCard` - displays goal with progress and target
+- `SavingsGoalForm` - dedicated add/edit form with validation
+- Updated `StepSavingsGoals` - uses new pattern with proper state management
 
-### Backend
-- Supabase database with Row Level Security
-- Proper household-scoped data access
-- Real-time subscription support where needed
-- Secure API routes with proper validation
-- Efficient data caching strategies
+### 4. Fixed Expenses Performance (MEDIUM PRIORITY)
+**Current Problem**: Step feels "loady" and laggy compared to income step
+**Target**: Smooth, responsive experience matching income step performance
+**Investigation Needed**: Identify performance bottlenecks
 
-### Integration
-- Plaid for bank transaction imports
-- AI services for recommendations
-- Email notifications system
-- Real-time updates for shared households
+### 5. UX Polish Improvements (MEDIUM PRIORITY)
+**Add Buttons at Top**: When user has many items, don't force scrolling to find "Add New"
+**Clean Editing Experience**: When editing item, hide summary cards to focus on form
+**Better Visual Hierarchy**: Ensure consistent spacing, loading states, error handling
 
-### Security
-- Row Level Security for all database tables
-- Proper authentication checks
-- Input validation and sanitization
-- Secure credential management
-- Protected API endpoints
+## Envelope Category Guidance
+**Problem**: User confusion about what envelopes should be vs SoFi Vaults
+**Solution**: Clear examples and onboarding guidance
 
-## User Experience
+**Envelopes (Spending Categories)**:
+- Groceries ($300/period)
+- Household & Maintenance ($100/period)  
+- Fun Money / Entertainment ($150/period)
+- Dining Out ($100/period)
+- Personal Care ($75/period)
+- Miscellaneous ($50/period)
 
-### Design System
-- Friendly, approachable interface
-- Consistent color scheme and typography
-- Clear visual hierarchy
-- Proper contrast and accessibility
-- Mobile-optimized touch targets
-- Intuitive navigation patterns
+**NOT Envelopes (These are Savings Goals)**:
+- Emergency Fund
+- Vacation Savings  
+- Car Replacement Fund
+- Home Down Payment
 
-### Responsive Design
-- Mobile-first approach
-- Tablet and desktop optimizations
-- Touch-friendly interface elements
-- Consistent experience across devices
+## Step-by-Step User Flow
 
-### Accessibility
-- WCAG 2.1 compliance
-- Screen reader support
-- Keyboard navigation
-- Proper color contrast
-- Reduced motion support
+### Current Working Pattern (Income & Fixed Expenses)
+1. User sees summary cards of existing items
+2. Clicks "Add New" or "Edit" on existing item
+3. Form appears (summary cards remain visible but in background)
+4. User saves item, returns to summary view
+5. Data persists when navigating between steps
 
-## Data Model
+### Target Pattern for Envelopes & Savings Goals
+1. **Summary View**: Cards showing existing envelopes/goals with key info
+2. **Add Mode**: Click "Add New" → dedicated form appears, summary cards disappear
+3. **Edit Mode**: Click "Edit" on card → dedicated form with existing data, summary cards disappear  
+4. **Save/Cancel**: Return to summary view with updated data
+5. **Top-Level Add Button**: Always visible for easy access
+6. **Database Integration**: Load existing data on step entry, save changes immediately
 
-### Core Tables
-- profiles (user accounts)
-- households (budget groups)
-- household_members (permissions)
-- paycheck_periods (budget cycles)
-- period_income (income tracking)
-- envelopes (categories)
-- period_envelopes (allocations)
-- fixed_expenses (bills)
-- period_fixed_expenses (bill instances)
-- savings_goals (targets)
-- savings_contributions (goal progress)
-- plaid_transactions (imports)
-- user_transactions (verified)
-- ai_recommendations (insights)
-- spending_insights (analysis)
+## Mobile-First Considerations
+- Touch-friendly card interfaces
+- Readable form inputs on small screens
+- Proper loading states during save operations
+- Optimistic updates for responsive feel
+</context>
+<PRD>
+# Technical Architecture  
 
-## Implementation Phases
+## Critical Issues to Resolve
 
-### Phase 1: Core Infrastructure
-1. Project setup with Next.js and Supabase
-2. Authentication system implementation
-3. Household management
-4. Basic database structure
-5. Protected routes and API endpoints
+### 1. Auth & Household Context System (🚨 HIGHEST PRIORITY)
+**Current Problem**: 
+```javascript
+// User navigates away from /budget-setup and returns
+// householdId becomes undefined, requiring page refresh
+const { user, householdId, loading, error } = useUser();
+// householdId is suddenly null/undefined
+```
 
-### Phase 2: Budget Foundation
-1. Paycheck period management
-2. Income source tracking
-3. Envelope system basics
-4. Fixed expense management
-5. Basic transaction entry
+**Root Cause Investigation Needed**:
+- Is the issue in `useUser` hook implementation?
+- Session management across page navigation?
+- Supabase client-side auth state persistence?
+- React context getting reset on route changes?
 
-### Phase 3: Advanced Features
-1. Plaid integration
-2. Savings goals system
-3. AI recommendations
-4. Transaction categorization
-5. Real-time updates
+**Technical Requirements**:
+- Audit `useUser` hook implementation
+- Ensure Supabase session persistence across navigation
+- Add error recovery without requiring page refresh
+- Implement proper context debugging/logging
 
-### Phase 4: Enhancement & Polish
-1. Mobile optimizations
-2. Performance improvements
-3. Advanced insights
-4. UI/UX refinements
-5. Additional customization options
+### 2. Database Schema Consistency
+**Current State**: 
+- ✅ Income sources: Enhanced frequency system implemented
+- ✅ Fixed expenses: Enhanced frequency system implemented  
+- 🔄 Envelopes table: May need frequency system for recurring allocations
+- 🔄 Savings goals table: May need frequency system for recurring contributions
 
-## Success Metrics
-- User engagement with budgeting features
-- Successful transaction categorization rate
-- Household collaboration effectiveness
-- AI recommendation accuracy
-- App performance metrics
-- User satisfaction scores
+**Required Schema Updates**:
+```sql
+-- Ensure envelopes table supports frequency (if needed for recurring allocations)
+ALTER TABLE envelopes ADD COLUMN frequency_type text;
+ALTER TABLE envelopes ADD COLUMN frequency_config jsonb;
 
-## Future Considerations
-- Dark mode support
-- Additional banking integrations
-- Advanced reporting features
-- Budget templating system
-- Mobile app versions
-- International currency support 
+-- Ensure savings_goals table supports frequency (if needed for recurring contributions)  
+ALTER TABLE savings_goals ADD COLUMN frequency_type text;
+ALTER TABLE savings_goals ADD COLUMN frequency_config jsonb;
+```
+
+## Component Architecture Requirements
+
+### 1. Envelope System Components (NEEDED)
+```typescript
+// src/components/budget-setup/envelope-summary-card.tsx
+interface EnvelopeSummaryCardProps {
+  envelope: {
+    id: string;
+    name: string;
+    default_amount: number;
+    rollover_rule: 'always_rollover' | 'rollover_limit' | 'always_to_savings';
+    rollover_limit?: number;
+  };
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+// src/components/budget-setup/envelope-form.tsx  
+interface EnvelopeFormProps {
+  envelope?: Envelope;
+  onSave: (envelope: Envelope) => void;
+  onCancel: () => void;
+  saving: boolean;
+}
+```
+
+### 2. Savings Goal Components (NEEDED)
+```typescript
+// src/components/budget-setup/savings-goal-summary-card.tsx
+interface SavingsGoalSummaryCardProps {
+  goal: {
+    id: string;
+    name: string;
+    target_amount: number;
+    current_balance: number;
+    target_date?: string;
+    is_emergency_fund: boolean;
+  };
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+// src/components/budget-setup/savings-goal-form.tsx
+interface SavingsGoalFormProps {
+  goal?: SavingsGoal; 
+  onSave: (goal: SavingsGoal) => void;
+  onCancel: () => void;
+  saving: boolean;
+}
+```
+
+### 3. State Management Pattern
+**Current Working Pattern** (from income/expenses):
+```typescript
+interface StepState {
+  items: T[];
+  editingItem: string | null;
+  addingNewItem: boolean;
+  loading: boolean;
+  saving: boolean;
+}
+
+// Clean editing experience
+const handleEdit = (item) => {
+  setState(prev => ({
+    ...prev,
+    editingItem: item.id,
+    addingNewItem: false // Hide summary cards during edit
+  }));
+};
+```
+
+## API Integration Requirements
+
+### 1. Missing API Routes
+```typescript
+// NEEDED: src/app/api/budget-setup/envelopes/route.ts
+POST /api/budget-setup/envelopes - Create/update envelopes
+GET /api/budget-setup/envelopes - Load existing envelopes
+DELETE /api/budget-setup/envelopes - Delete envelope
+
+// NEEDED: src/app/api/budget-setup/savings-goals/route.ts  
+POST /api/budget-setup/savings-goals - Create/update goals
+GET /api/budget-setup/savings-goals - Load existing goals
+DELETE /api/budget-setup/savings-goals - Delete goal
+```
+
+### 2. Database Operations
+```typescript
+// Load existing data on step entry
+const loadEnvelopes = async (householdId: string) => {
+  const { data, error } = await supabase
+    .from('envelopes')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('is_active', true)
+    .order('sort_order');
+  return { data, error };
+};
+
+// Save with proper validation
+const saveEnvelope = async (envelope: Envelope) => {
+  const { data, error } = await supabase
+    .from('envelopes')
+    .upsert(envelope)
+    .select()
+    .single();
+  return { data, error };
+};
+```
+
+## Performance Optimization
+
+### 1. Fixed Expenses Step Performance Issue
+**Current Problem**: Step feels "loady" and laggy vs income step
+**Investigation Required**:
+- Compare bundle sizes between StepIncome vs StepFixedExpenses  
+- Check for unnecessary re-renders
+- Audit database query performance
+- Review component mounting/unmounting patterns
+
+**Optimization Targets**:
+- Sub-200ms form interactions
+- Smooth animations and transitions  
+- Efficient data loading patterns
+- Proper loading state management
+
+### 2. Bundle Optimization
+```typescript
+// Lazy load heavy components
+const EnvelopeForm = lazy(() => import('./envelope-form'));
+const SavingsGoalForm = lazy(() => import('./savings-goal-form'));
+
+// Minimize context re-renders
+const BudgetSetupContext = memo(({ children }) => {
+  const value = useMemo(() => ({
+    // context value
+  }), [dependencies]);
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+});
+```
+
+# Development Roadmap  
+
+## Phase 1: Critical Bug Fixes (Week 1)
+**Goal**: Resolve blocking auth/context issue and performance problems
+
+### 1.1 Fix Auth/Household Context Issue (CRITICAL - 2-3 days)
+- **Audit `useUser` hook**: Identify why householdId gets lost on navigation
+- **Session persistence**: Ensure Supabase auth state survives route changes  
+- **Error recovery**: Add context restoration without page refresh
+- **Debug logging**: Add comprehensive logging for context loss scenarios
+- **Testing**: Verify fix across different navigation patterns
+
+### 1.2 Fixed Expenses Performance Optimization (HIGH - 1-2 days)
+- **Performance audit**: Identify bottlenecks causing "loady/laggy" experience
+- **Component optimization**: Reduce unnecessary re-renders
+- **Database optimization**: Improve query performance  
+- **Loading states**: Ensure smooth, responsive interactions
+- **Comparison**: Match performance of income step
+
+### 1.3 UX Polish Improvements (MEDIUM - 1 day)
+- **Add buttons at top**: All steps get top-level "Add New" button
+- **Clean editing experience**: Hide summary cards when editing
+- **Consistent styling**: Ensure spacing and visual hierarchy match
+- **Error handling**: Improve validation feedback and error states
+
+## Phase 2: Envelope System Modernization (Week 2)  
+**Goal**: Update envelopes step to match income/expense patterns
+
+### 2.1 Envelope Summary Card Component (2 days)
+- **Design**: Match visual style of income/expense summary cards
+- **Content**: Display envelope name, amount, rollover rule
+- **Actions**: Edit and delete buttons with proper confirmation
+- **Responsive**: Mobile-friendly card layout
+
+### 2.2 Envelope Form Component (2 days)  
+- **Form fields**: Name, amount, rollover rule selection
+- **Validation**: Required fields, positive amounts, rollover limits
+- **User guidance**: Help text explaining rollover rules
+- **Categories**: Provide suggested envelope categories (groceries, household, etc.)
+
+### 2.3 Step Envelopes Integration (1 day)
+- **State management**: Implement proper editing states  
+- **Database integration**: Load existing envelopes, save changes immediately
+- **Navigation**: Ensure data persists across step navigation
+- **Testing**: End-to-end envelope management workflow
+
+## Phase 3: Savings Goals Modernization (Week 3)
+**Goal**: Update savings goals step to match established patterns
+
+### 3.1 Savings Goal Summary Card Component (2 days)
+- **Progress display**: Visual progress bar toward target amount
+- **Goal details**: Name, current amount, target amount, target date
+- **Emergency fund**: Special styling for emergency fund priority
+- **Actions**: Edit and delete with proper confirmation
+
+### 3.2 Savings Goal Form Component (2 days)
+- **Form fields**: Name, target amount, target date, emergency fund flag
+- **Progress tracking**: Current amount input for existing goals
+- **Contribution planning**: Default contribution amount per period
+- **Validation**: Target amounts, realistic dates, emergency fund logic
+
+### 3.3 Step Savings Goals Integration (1 day)  
+- **State management**: Match envelope step patterns
+- **Database integration**: Full CRUD operations
+- **Emergency fund logic**: Ensure at least one emergency fund exists
+- **Goal achievement**: Progress calculation and display
+
+## Phase 4: Flow Integration & Polish (Week 4)
+**Goal**: Ensure seamless end-to-end budget setup experience
+
+### 4.1 End-to-End Flow Testing (2 days)
+- **Step navigation**: Forward/backward with data persistence
+- **Validation**: Proper error handling at each step
+- **Completion**: Successful setup completion and redirection
+- **Edge cases**: Handle incomplete data, validation failures
+
+### 4.2 Database Schema Finalization (1 day)
+- **Frequency system**: Extend to envelopes/savings goals if needed
+- **Constraints**: Ensure data integrity rules are enforced
+- **Indexes**: Optimize query performance for household data
+- **Migration**: Handle any existing data migration needs
+
+### 4.3 User Guidance & Onboarding (2 days)
+- **Envelope guidance**: Clear examples of spending vs savings categories
+- **Default suggestions**: Pre-populate common envelopes and amounts
+- **Help text**: Context-sensitive guidance throughout setup
+- **Success state**: Clear confirmation of completed setup
+
+# Logical Dependency Chain
+
+## Critical Path (Must Complete in Order)
+
+### 1. Auth/Context Fix (FOUNDATION)
+**Why First**: Nothing else works reliably until users can navigate without losing context
+**Blocks**: All other development work
+**Dependencies**: None - this is the foundation
+**Timeline**: 2-3 days maximum
+
+### 2. Performance Optimization (FOUNDATION)  
+**Why Second**: Users will judge the app quality based on performance
+**Blocks**: User acceptance of current functionality
+**Dependencies**: Auth fix (for reliable testing)
+**Timeline**: 1-2 days
+
+### 3. Envelope Modernization (CORE FUNCTIONALITY)
+**Why Third**: Envelopes are core to zero-based budgeting concept
+**Blocks**: Complete budget setup workflow
+**Dependencies**: Auth fix, performance baseline
+**Timeline**: 5 days (components + integration)
+
+### 4. Savings Goals Modernization (COMPLETE WORKFLOW)
+**Why Fourth**: Completes the budget setup flow
+**Blocks**: End-to-end user onboarding
+**Dependencies**: Envelope patterns established
+**Timeline**: 5 days (reuse envelope patterns)
+
+### 5. Flow Integration (POLISH)
+**Why Last**: Ensures everything works together seamlessly
+**Dependencies**: All individual steps working
+**Timeline**: 5 days (testing + polish)
+
+## Parallel Development Opportunities
+
+**Weeks 2-3**: While building envelope/savings components, can simultaneously:
+- Improve general UX patterns (loading states, animations)
+- Optimize bundle sizes and performance
+- Write comprehensive tests
+- Update documentation
+
+**Week 4**: While doing flow integration:
+- Plan next phase (period management)
+- User testing and feedback collection
+- Performance monitoring setup
+- Production deployment preparation
+
+# Risks and Mitigations  
+
+## Technical Risks
+
+### High Probability, High Impact
+
+#### Risk: Auth/Context Issue is More Complex Than Expected
+**Scenario**: Root cause involves deep Supabase session management or React Router issues
+**Impact**: Could delay entire project by 1-2 weeks
+**Mitigation**: 
+- Allocate 3 full days maximum for investigation
+- Have backup plan to implement simpler context management
+- Consider alternative auth patterns if needed
+- Engage Supabase community/support if necessary
+
+#### Risk: Envelope/Savings Goal APIs Don't Exist
+**Scenario**: Current API endpoints are placeholders or non-functional
+**Impact**: Medium delay while building backend functionality
+**Mitigation**:
+- Audit existing API routes before starting component work
+- Build API routes first, then components
+- Use consistent patterns from working income/expense APIs
+- Have database schema ready and tested
+
+### Medium Probability, Medium Impact
+
+#### Risk: Performance Issues Affect All Steps
+**Scenario**: Fixed expense performance problem is systemic, not isolated
+**Impact**: May need broader architecture changes
+**Mitigation**:
+- Performance audit across all steps immediately
+- Identify common patterns causing slowdowns
+- Plan for component lazy loading and code splitting
+- Consider state management optimization
+
+#### Risk: User Testing Reveals Major UX Issues  
+**Scenario**: Envelope categorization is confusing, flow is not intuitive
+**Impact**: May require design changes and additional development time
+**Mitigation**:
+- Start with clear envelope examples and guidance
+- Implement flexible category system for easy changes
+- Plan for iterative improvements based on feedback
+- Focus on making patterns consistent rather than perfect
+
+## Scope and Resource Risks
+
+### High Probability, Medium Impact
+
+#### Risk: Feature Scope Creep
+**Scenario**: During development, "nice to have" features get added
+**Impact**: Delays completion of core functionality
+**Mitigation**:
+- Strict adherence to 4-week timeline
+- Document feature requests for future phases
+- Focus on matching existing income/expense patterns exactly
+- Regular scope review meetings
+
+#### Risk: Single Developer Bandwidth
+**Scenario**: One person building all components may be overloaded
+**Impact**: Quality or timeline compromises
+**Mitigation**:
+- Reuse established patterns as much as possible
+- Focus on functional completion over visual perfection
+- Plan for iterative improvements in later phases
+- Use component libraries and existing code extensively
+
+## User Experience Risks
+
+### Medium Probability, High Impact
+
+#### Risk: Envelope Categorization Confusion
+**Scenario**: Users don't understand spending envelopes vs savings goals
+**Impact**: Incorrect budget setup leading to poor user experience
+**Mitigation**:
+- Clear onboarding with specific examples
+- Visual differentiation between envelopes and goals
+- Help text and guidance throughout forms
+- Default categories that demonstrate proper usage
+
+#### Risk: Data Loss During Setup
+**Scenario**: Navigation or context issues cause users to lose entered data
+**Impact**: Users abandon setup process
+**Mitigation**:
+- Implement robust data persistence across steps
+- Add "unsaved changes" warnings
+- Auto-save functionality where possible
+- Clear progress indicators
+
+## Success Criteria
+
+### Phase 1 Success (Week 1)
+- ✅ Users can navigate away from budget setup and return without refresh
+- ✅ Fixed expenses step performs as smoothly as income step
+- ✅ All steps have "Add New" buttons at top of sections
+- ✅ Clean editing experience with summary cards hidden during edits
+
+### Phase 2 Success (Week 2)  
+- ✅ Envelope step matches visual and functional quality of income step
+- ✅ Users can create, edit, delete envelopes with proper validation
+- ✅ Rollover rules are clearly explained and configurable
+- ✅ Default envelope suggestions guide users to proper categories
+
+### Phase 3 Success (Week 3)
+- ✅ Savings goals step matches established patterns
+- ✅ Progress tracking works correctly for existing goals
+- ✅ Emergency fund priority is clear and enforced
+- ✅ Target dates and contribution planning are intuitive
+
+### Phase 4 Success (Week 4)
+- ✅ Complete budget setup flow works end-to-end without errors
+- ✅ Users can successfully complete setup in under 10 minutes
+- ✅ Data persists correctly across all step navigation
+- ✅ Error handling provides clear, actionable feedback
+
+# Appendix  
+
+## Established UI Patterns (From Income/Expenses)
+
+### Summary Card Pattern
+```typescript
+// Established visual design
+<Card className="p-4">
+  <div className="flex justify-between items-center">
+    <div>
+      <h3 className="font-medium">{item.name}</h3>
+      <p className="text-sm text-muted-foreground">{item.details}</p>
+    </div>
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" onClick={onEdit}>Edit</Button>
+      <Button size="sm" variant="destructive" onClick={onDelete}>Delete</Button>
+    </div>
+  </div>
+</Card>
+```
+
+### Form Pattern
+```typescript
+// Dedicated form components with validation
+const ItemForm = ({ item, onSave, onCancel, saving }) => {
+  const form = useForm({
+    resolver: zodResolver(itemSchema),
+    defaultValues: item || defaultValues
+  });
+  
+  return (
+    <form onSubmit={form.handleSubmit(onSave)}>
+      {/* Form fields */}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? <Loader2 className="w-4 h-4" /> : "Save"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+};
+```
+
+### State Management Pattern
+```typescript
+// Consistent state structure across steps
+interface StepState {
+  items: T[];
+  editingItem: string | null;
+  addingNewItem: boolean;
+  loading: boolean;
+  saving: boolean;
+}
+
+// Clean editing experience
+const handleEdit = (item) => {
+  setState(prev => ({
+    ...prev,
+    editingItem: item.id,
+    addingNewItem: false
+  }));
+};
+```
+
+## Envelope Categories Reference
+
+### Recommended Default Envelopes
+```typescript
+const DEFAULT_ENVELOPES = [
+  { name: "Groceries", amount: 300, rolloverRule: "rollover_limit", rolloverLimit: 100 },
+  { name: "Household & Maintenance", amount: 100, rolloverRule: "rollover_limit", rolloverLimit: 50 },
+  { name: "Fun Money", amount: 150, rolloverRule: "always_to_savings" },
+  { name: "Dining Out", amount: 100, rolloverRule: "always_to_savings" },
+  { name: "Personal Care", amount: 75, rolloverRule: "rollover_limit", rolloverLimit: 25 },
+  { name: "Miscellaneous", amount: 50, rolloverRule: "always_rollover" }
+];
+```
+
+### NOT Envelopes (These are Savings Goals)
+- Emergency Fund
+- Vacation Savings
+- Car Replacement
+- Home Down Payment
+- Debt Payoff Goals
+
+## Technical Debt Items
+
+### Current Known Issues
+1. **Context persistence**: Auth/household context loss on navigation
+2. **Performance**: Fixed expenses step lag compared to income
+3. **Component patterns**: Envelopes/savings using outdated form array pattern
+4. **Error handling**: Inconsistent validation feedback across steps
+5. **Loading states**: Some components lack proper loading indicators
+
+### Future Optimization Opportunities
+1. **Code splitting**: Lazy load heavy form components
+2. **State management**: Consider moving from Context to Zustand for better performance
+3. **Bundle optimization**: Remove unused dependencies, optimize imports
+4. **Database queries**: Add proper indexing and query optimization
+5. **Caching**: Implement intelligent data caching for repeated API calls
+
+## Development Environment Notes
+
+### Testing Strategy
+- **Unit tests**: All new components with comprehensive coverage
+- **Integration tests**: Complete step workflows
+- **E2E tests**: Full budget setup flow
+- **Performance tests**: Load testing for database operations
+
+### Quality Assurance  
+- **Code review**: All PRs require review before merge
+- **TypeScript strict**: No `any` types, complete interface definitions
+- **ESLint/Prettier**: Consistent code formatting
+- **Performance monitoring**: Bundle size tracking, render performance
+
+### Deployment Plan
+- **Feature flags**: Gradual rollout of new components
+- **Database migrations**: Safe schema updates with rollback plans
+- **Monitoring**: Error tracking and performance monitoring
+- **User feedback**: In-app feedback collection for new features

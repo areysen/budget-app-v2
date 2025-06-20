@@ -3,10 +3,10 @@
     "tasks": [
       {
         "id": 1,
-        "title": "Setup Project Repository and Development Environment",
-        "description": "Initialize the project repository and set up the development environment with necessary tools and configurations.",
-        "details": "1. Create a new Git repository\n2. Initialize a Node.js project with npm init\n3. Set up ESLint for code linting (use eslint-config-airbnb-base)\n4. Configure Prettier for code formatting\n5. Set up Jest for unit testing\n6. Create a .gitignore file\n7. Set up a CI/CD pipeline using GitHub Actions\n8. Install core dependencies: React v18.2.0, React Native v0.71.8, TypeScript v5.1.3\n9. Configure TypeScript (tsconfig.json)\n10. Set up a mobile-first development environment using Expo v48.0.0",
-        "testStrategy": "Verify that all tools and configurations are working correctly by running sample commands and checks.",
+        "title": "Fix Auth & Household Context System",
+        "description": "Resolve the critical issue where householdId context gets lost when users navigate away from budget setup and returns.",
+        "details": "1. Audit the `useUser` hook implementation to identify why householdId becomes undefined on navigation.\n2. Ensure Supabase session persistence across route changes.\n3. Add proper error recovery without requiring page refresh.\n4. Implement debugging/logging for context loss scenarios.\n\nPossible implementation:\n```typescript\n// src/hooks/useUser.ts\nexport function useUser() {\n  const [state, setState] = useState({\n    user: null,\n    householdId: null,\n    loading: true,\n    error: null\n  });\n\n  // Use localStorage as fallback for householdId\n  useEffect(() => {\n    const storedHouseholdId = localStorage.getItem('householdId');\n    \n    // Subscribe to auth state changes\n    const { data: { subscription } } = supabase.auth.onAuthStateChange(\n      async (event, session) => {\n        setState(prev => ({ ...prev, loading: true }));\n        \n        if (session) {\n          try {\n            // Get user's household\n            const { data, error } = await supabase\n              .from('household_members')\n              .select('household_id')\n              .eq('user_id', session.user.id)\n              .single();\n            \n            if (error) throw error;\n            \n            // Store householdId in localStorage as backup\n            if (data?.household_id) {\n              localStorage.setItem('householdId', data.household_id);\n            }\n            \n            setState({\n              user: session.user,\n              householdId: data?.household_id || storedHouseholdId,\n              loading: false,\n              error: null\n            });\n          } catch (error) {\n            console.error('Error fetching household:', error);\n            setState({\n              user: session.user,\n              householdId: storedHouseholdId, // Use fallback\n              loading: false,\n              error\n            });\n          }\n        } else {\n          // User is not authenticated\n          localStorage.removeItem('householdId');\n          setState({\n            user: null,\n            householdId: null,\n            loading: false,\n            error: null\n          });\n        }\n      }\n    );\n    \n    // Cleanup subscription\n    return () => {\n      subscription.unsubscribe();\n    };\n  }, []);\n\n  return state;\n}\n```",
+        "testStrategy": "1. Unit test the `useUser` hook with mocked Supabase responses.\n2. Integration test for navigation scenarios:\n   - Navigate from budget setup to another page and back\n   - Refresh the page during budget setup\n   - Test with network interruptions\n3. Verify householdId persistence across different navigation patterns.\n4. Test error recovery mechanisms when context is lost.\n5. Verify that users don't need to refresh the page when returning to budget setup.",
         "priority": "high",
         "dependencies": [],
         "status": "done",
@@ -14,493 +14,133 @@
       },
       {
         "id": 2,
-        "title": "Design and Implement Core Data Models",
-        "description": "Create the core data models for the budget app, including income sources, paycheck periods, envelopes, fixed items, and vaults.",
-        "details": "1. Use TypeScript interfaces to define data models\n2. Implement classes for each model with appropriate methods\n3. Use Zod v3.21.4 for runtime type checking and validation\n4. Implement the following models:\n   - IncomeSource\n   - PaycheckPeriod\n   - Envelope\n   - FixedItem\n   - Vault\n   - Transaction\n5. Implement methods for calculating balances, rollovers, and other core functionalities\n6. Use the Strategy pattern for configurable behaviors (e.g., envelope rollover strategies)\n7. Implement a Factory pattern for creating instances of these models",
-        "testStrategy": "Write unit tests for each model and their methods using Jest. Ensure all edge cases are covered, especially for date-based calculations and rollover behaviors.",
+        "title": "Optimize Fixed Expenses Step Performance",
+        "description": "Improve the performance of the Fixed Expenses step which currently feels 'loady' and laggy compared to the income step.",
+        "details": "1. Perform a performance audit to identify bottlenecks:\n   - Compare bundle sizes between StepIncome vs StepFixedExpenses\n   - Check for unnecessary re-renders using React DevTools\n   - Audit database query performance\n   - Review component mounting/unmounting patterns\n\n2. Implement optimizations:\n```typescript\n// Memoize expensive components\nconst FixedExpenseSummaryCard = memo(({ expense, onEdit, onDelete }) => {\n  // Component implementation\n});\n\n// Optimize database queries\nconst loadFixedExpenses = async (householdId: string) => {\n  // Add proper indexes to the database\n  // Use select only needed fields\n  const { data, error } = await supabase\n    .from('fixed_expenses')\n    .select('id, name, amount, frequency_type, frequency_config')\n    .eq('household_id', householdId)\n    .eq('is_active', true)\n    .order('sort_order');\n  return { data, error };\n};\n\n// Implement virtualization for long lists\nimport { useVirtualizer } from '@tanstack/react-virtual';\n\nconst ExpensesList = ({ expenses }) => {\n  const parentRef = useRef();\n  \n  const rowVirtualizer = useVirtualizer({\n    count: expenses.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 80, // Approximate row height\n  });\n  \n  return (\n    <div ref={parentRef} className=\"h-[500px] overflow-auto\">\n      <div\n        style={{\n          height: `${rowVirtualizer.getTotalSize()}px`,\n          position: 'relative',\n        }}\n      >\n        {rowVirtualizer.getVirtualItems().map((virtualRow) => (\n          <div\n            key={virtualRow.index}\n            style={{\n              position: 'absolute',\n              top: 0,\n              left: 0,\n              width: '100%',\n              height: `${virtualRow.size}px`,\n              transform: `translateY(${virtualRow.start}px)`,\n            }}\n          >\n            <FixedExpenseSummaryCard \n              expense={expenses[virtualRow.index]}\n              onEdit={() => handleEdit(expenses[virtualRow.index])}\n              onDelete={() => handleDelete(expenses[virtualRow.index])}\n            />\n          </div>\n        ))}\n      </div>\n    </div>\n  );\n};\n```\n\n3. Implement lazy loading for the form component:\n```typescript\nconst FixedExpenseForm = lazy(() => import('./fixed-expense-form'));\n```\n\n4. Optimize state updates to prevent unnecessary re-renders:\n```typescript\nconst handleSave = useCallback(async (expense) => {\n  // Implementation\n}, [dependencies]);\n```",
+        "testStrategy": "1. Measure performance before and after optimizations using:\n   - React DevTools Profiler\n   - Lighthouse performance metrics\n   - Custom timing measurements for key operations\n2. Test with large datasets (20+ expenses) to ensure smooth performance\n3. Verify sub-200ms form interactions\n4. Compare bundle sizes before and after optimizations\n5. Test on lower-end devices to ensure performance improvements are universal",
         "priority": "high",
         "dependencies": [
           1
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 3,
-        "title": "Implement Paycheck Period Logic",
-        "description": "Develop the core logic for managing paycheck periods, including automatic period creation and early paycheck handling.",
-        "details": "1. Use date-fns v2.30.0 for date manipulation\n2. Implement a PaycheckPeriodManager class with methods for:\n   - Automatically creating new periods based on schedules\n   - Handling early paychecks (manual override)\n   - Calculating total income for a period (including secondary income)\n3. Implement logic to ensure conservative budgeting until secondary income arrives\n4. Use the Observer pattern to notify relevant parts of the app when a new period starts\n5. Implement a cron job using node-cron v3.0.2 to check and create new periods daily",
-        "testStrategy": "Create comprehensive unit tests for the PaycheckPeriodManager, including edge cases like months with varying numbers of days. Use Jest's timer mocks to test time-based functionalities.",
-        "priority": "high",
+        "title": "Create Envelope Summary Card Component",
+        "description": "Develop the EnvelopeSummaryCard component that displays envelope information with edit and delete actions, matching the established UI pattern from income/expenses.",
+        "details": "Create a new component that displays envelope information in a card format with edit and delete actions:\n\n```typescript\n// src/components/budget-setup/envelope-summary-card.tsx\nimport { Button } from \"@/components/ui/button\";\nimport { Card } from \"@/components/ui/card\";\nimport { formatCurrency } from \"@/lib/utils\";\n\ninterface EnvelopeSummaryCardProps {\n  envelope: {\n    id: string;\n    name: string;\n    default_amount: number;\n    rollover_rule: 'always_rollover' | 'rollover_limit' | 'always_to_savings';\n    rollover_limit?: number;\n  };\n  onEdit: () => void;\n  onDelete: () => void;\n}\n\nexport function EnvelopeSummaryCard({ envelope, onEdit, onDelete }: EnvelopeSummaryCardProps) {\n  // Format rollover rule for display\n  const getRolloverText = () => {\n    switch (envelope.rollover_rule) {\n      case 'always_rollover':\n        return 'Always rolls over';\n      case 'rollover_limit':\n        return `Rolls over up to ${formatCurrency(envelope.rollover_limit || 0)}`;\n      case 'always_to_savings':\n        return 'Excess goes to savings';\n      default:\n        return '';\n    }\n  };\n\n  return (\n    <Card className=\"p-4 mb-4\">\n      <div className=\"flex justify-between items-center\">\n        <div>\n          <h3 className=\"font-medium\">{envelope.name}</h3>\n          <p className=\"text-sm text-muted-foreground\">\n            {formatCurrency(envelope.default_amount)} per period\n          </p>\n          <p className=\"text-xs text-muted-foreground\">\n            {getRolloverText()}\n          </p>\n        </div>\n        <div className=\"flex gap-2\">\n          <Button size=\"sm\" variant=\"outline\" onClick={onEdit}>Edit</Button>\n          <Button size=\"sm\" variant=\"destructive\" onClick={onDelete}>Delete</Button>\n        </div>\n      </div>\n    </Card>\n  );\n}\n```",
+        "testStrategy": "1. Unit test the EnvelopeSummaryCard component:\n   - Verify it renders correctly with all envelope data\n   - Test all rollover rule display variations\n   - Verify edit and delete buttons trigger the correct callbacks\n   - Test responsive layout on different screen sizes\n2. Visual regression tests to ensure the card matches the established UI pattern\n3. Accessibility testing for proper contrast, focus states, and screen reader support",
+        "priority": "medium",
         "dependencies": [
-          2
+          1
         ],
-        "status": "in-progress",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 4,
-        "title": "Develop Zero-Based Budgeting System",
-        "description": "Implement the core zero-based budgeting system, ensuring every dollar of income is assigned a purpose.",
-        "details": "1. Create a BudgetManager class to handle allocation of income\n2. Implement methods for:\n   - Allocating money to envelopes, fixed items, and vaults\n   - Calculating unallocated money\n   - Reallocating funds between categories\n3. Use the Command pattern for allocation actions to support undo/redo functionality\n4. Implement a priority queue using a heap data structure for allocation order\n5. Use BigNumber.js v9.1.1 for precise financial calculations\n6. Implement budget constraints to ensure allocations don't exceed available funds",
-        "testStrategy": "Write unit tests for the BudgetManager, covering various allocation scenarios. Include tests for edge cases like rounding errors and reallocation limits.",
-        "priority": "high",
+        "title": "Create Envelope Form Component",
+        "description": "Develop the EnvelopeForm component for adding and editing envelopes with proper validation and user guidance.",
+        "details": "Create a form component for adding and editing envelopes with validation:\n\n```typescript\n// src/components/budget-setup/envelope-form.tsx\nimport { zodResolver } from \"@zodResolver/form\";\nimport { useForm } from \"react-hook-form\";\nimport { z } from \"zod\";\nimport { Button } from \"@/components/ui/button\";\nimport { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from \"@/components/ui/form\";\nimport { Input } from \"@/components/ui/input\";\nimport { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from \"@/components/ui/select\";\nimport { Loader2 } from \"lucide-react\";\n\n// Validation schema\nconst envelopeSchema = z.object({\n  id: z.string().optional(),\n  name: z.string().min(1, \"Name is required\"),\n  default_amount: z.coerce.number().positive(\"Amount must be greater than 0\"),\n  rollover_rule: z.enum([\"always_rollover\", \"rollover_limit\", \"always_to_savings\"]),\n  rollover_limit: z.coerce.number().positive().optional().nullable(),\n  household_id: z.string()\n});\n\ntype EnvelopeFormValues = z.infer<typeof envelopeSchema>;\n\ninterface EnvelopeFormProps {\n  envelope?: EnvelopeFormValues;\n  householdId: string;\n  onSave: (envelope: EnvelopeFormValues) => void;\n  onCancel: () => void;\n  saving: boolean;\n}\n\nexport function EnvelopeForm({ envelope, householdId, onSave, onCancel, saving }: EnvelopeFormProps) {\n  // Default values\n  const defaultValues: Partial<EnvelopeFormValues> = {\n    name: \"\",\n    default_amount: 0,\n    rollover_rule: \"always_rollover\",\n    rollover_limit: null,\n    household_id: householdId,\n    ...envelope\n  };\n\n  const form = useForm<EnvelopeFormValues>({\n    resolver: zodResolver(envelopeSchema),\n    defaultValues,\n  });\n\n  // Watch rollover rule to conditionally show rollover limit\n  const rolloverRule = form.watch(\"rollover_rule\");\n  const showRolloverLimit = rolloverRule === \"rollover_limit\";\n\n  // Handle form submission\n  const onSubmit = (values: EnvelopeFormValues) => {\n    // If rollover rule is not rollover_limit, set limit to null\n    if (values.rollover_rule !== \"rollover_limit\") {\n      values.rollover_limit = null;\n    }\n    onSave(values);\n  };\n\n  return (\n    <Form {...form}>\n      <form onSubmit={form.handleSubmit(onSubmit)} className=\"space-y-6\">\n        <FormField\n          control={form.control}\n          name=\"name\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Envelope Name</FormLabel>\n              <FormControl>\n                <Input placeholder=\"Groceries\" {...field} />\n              </FormControl>\n              <FormDescription>\n                Name for this spending category (e.g., Groceries, Fun Money)\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"default_amount\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Amount per Period</FormLabel>\n              <FormControl>\n                <Input type=\"number\" min=\"0\" step=\"0.01\" {...field} />\n              </FormControl>\n              <FormDescription>\n                How much to allocate to this envelope each paycheck period\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"rollover_rule\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Rollover Rule</FormLabel>\n              <Select\n                onValueChange={field.onChange}\n                defaultValue={field.value}\n              >\n                <FormControl>\n                  <SelectTrigger>\n                    <SelectValue placeholder=\"Select a rollover rule\" />\n                  </SelectTrigger>\n                </FormControl>\n                <SelectContent>\n                  <SelectItem value=\"always_rollover\">Always Rollover</SelectItem>\n                  <SelectItem value=\"rollover_limit\">Rollover with Limit</SelectItem>\n                  <SelectItem value=\"always_to_savings\">Always to Savings</SelectItem>\n                </SelectContent>\n              </Select>\n              <FormDescription>\n                {field.value === \"always_rollover\" && \"Unused funds always roll over to the next period\"}\n                {field.value === \"rollover_limit\" && \"Unused funds roll over up to a specified limit\"}\n                {field.value === \"always_to_savings\" && \"Unused funds always go to savings\"}\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        {showRolloverLimit && (\n          <FormField\n            control={form.control}\n            name=\"rollover_limit\"\n            render={({ field }) => (\n              <FormItem>\n                <FormLabel>Rollover Limit</FormLabel>\n                <FormControl>\n                  <Input type=\"number\" min=\"0\" step=\"0.01\" {...field} value={field.value || ''} />\n                </FormControl>\n                <FormDescription>\n                  Maximum amount that can roll over to the next period\n                </FormDescription>\n                <FormMessage />\n              </FormItem>\n            )}\n          />\n        )}\n\n        <div className=\"flex gap-2\">\n          <Button type=\"submit\" disabled={saving}>\n            {saving ? <Loader2 className=\"w-4 h-4 mr-2 animate-spin\" /> : null}\n            Save\n          </Button>\n          <Button type=\"button\" variant=\"outline\" onClick={onCancel}>\n            Cancel\n          </Button>\n        </div>\n      </form>\n    </Form>\n  );\n}\n```",
+        "testStrategy": "1. Unit test the EnvelopeForm component:\n   - Test form validation for required fields\n   - Test conditional rendering of rollover limit field\n   - Verify form submission with correct values\n   - Test form cancellation\n2. Integration test with mock API calls\n3. Test form behavior with different initial values\n4. Verify proper handling of loading states during save operations\n5. Test form accessibility including keyboard navigation and screen reader support",
+        "priority": "medium",
         "dependencies": [
-          2,
-          3
+          1
         ],
-        "status": "in-progress",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 5,
-        "title": "Implement Envelope System",
-        "description": "Phase 1: Modernize Envelopes Step - Update the envelope system UI to match established income/expense patterns and integrate with the budget setup flow's state management.",
-        "status": "in-progress",
+        "title": "Implement Envelope Step Integration",
+        "description": "Update the StepEnvelopes component to use the new EnvelopeSummaryCard and EnvelopeForm components with proper state management and API integration.",
+        "details": "Implement the StepEnvelopes component that integrates the new envelope components with proper state management and API calls:\n\n```typescript\n// src/components/budget-setup/step-envelopes.tsx\nimport { useState, useEffect } from \"react\";\nimport { useUser } from \"@/hooks/useUser\";\nimport { Button } from \"@/components/ui/button\";\nimport { EnvelopeSummaryCard } from \"./envelope-summary-card\";\nimport { EnvelopeForm } from \"./envelope-form\";\nimport { supabase } from \"@/lib/supabase\";\nimport { Loader2 } from \"lucide-react\";\nimport { Alert, AlertDescription } from \"@/components/ui/alert\";\n\n// Default envelope suggestions\nconst DEFAULT_ENVELOPES = [\n  { name: \"Groceries\", default_amount: 300, rollover_rule: \"rollover_limit\", rollover_limit: 100 },\n  { name: \"Household & Maintenance\", default_amount: 100, rollover_rule: \"rollover_limit\", rollover_limit: 50 },\n  { name: \"Fun Money\", default_amount: 150, rollover_rule: \"always_to_savings\" },\n  { name: \"Dining Out\", default_amount: 100, rollover_rule: \"always_to_savings\" },\n  { name: \"Personal Care\", default_amount: 75, rollover_rule: \"rollover_limit\", rollover_limit: 25 },\n  { name: \"Miscellaneous\", default_amount: 50, rollover_rule: \"always_rollover\" }\n];\n\nexport function StepEnvelopes() {\n  const { user, householdId, loading: userLoading } = useUser();\n  \n  const [state, setState] = useState({\n    envelopes: [],\n    editingEnvelope: null,\n    addingNewEnvelope: false,\n    loading: true,\n    saving: false,\n    error: null\n  });\n  \n  // Load envelopes on component mount\n  useEffect(() => {\n    if (householdId) {\n      loadEnvelopes();\n    }\n  }, [householdId]);\n  \n  // Load envelopes from database\n  const loadEnvelopes = async () => {\n    setState(prev => ({ ...prev, loading: true, error: null }));\n    \n    try {\n      const { data, error } = await supabase\n        .from('envelopes')\n        .select('*')\n        .eq('household_id', householdId)\n        .eq('is_active', true)\n        .order('sort_order');\n      \n      if (error) throw error;\n      \n      setState(prev => ({\n        ...prev,\n        envelopes: data || [],\n        loading: false\n      }));\n    } catch (error) {\n      console.error('Error loading envelopes:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to load envelopes. Please try again.',\n        loading: false\n      }));\n    }\n  };\n  \n  // Handle adding a new envelope\n  const handleAddNew = () => {\n    setState(prev => ({\n      ...prev,\n      addingNewEnvelope: true,\n      editingEnvelope: null\n    }));\n  };\n  \n  // Handle editing an envelope\n  const handleEdit = (envelope) => {\n    setState(prev => ({\n      ...prev,\n      editingEnvelope: envelope,\n      addingNewEnvelope: false\n    }));\n  };\n  \n  // Handle canceling add/edit\n  const handleCancel = () => {\n    setState(prev => ({\n      ...prev,\n      editingEnvelope: null,\n      addingNewEnvelope: false\n    }));\n  };\n  \n  // Handle saving an envelope\n  const handleSave = async (envelope) => {\n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      // Add household_id if not present\n      if (!envelope.household_id) {\n        envelope.household_id = householdId;\n      }\n      \n      // Add sort_order if new envelope\n      if (!envelope.id) {\n        envelope.sort_order = state.envelopes.length;\n        envelope.is_active = true;\n      }\n      \n      const { data, error } = await supabase\n        .from('envelopes')\n        .upsert(envelope)\n        .select()\n        .single();\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => {\n        const updatedEnvelopes = envelope.id\n          ? prev.envelopes.map(e => e.id === envelope.id ? data : e)\n          : [...prev.envelopes, data];\n        \n        return {\n          ...prev,\n          envelopes: updatedEnvelopes,\n          editingEnvelope: null,\n          addingNewEnvelope: false,\n          saving: false\n        };\n      });\n    } catch (error) {\n      console.error('Error saving envelope:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to save envelope. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Handle deleting an envelope\n  const handleDelete = async (envelope) => {\n    if (!confirm('Are you sure you want to delete this envelope?')) return;\n    \n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      const { error } = await supabase\n        .from('envelopes')\n        .update({ is_active: false })\n        .eq('id', envelope.id);\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => ({\n        ...prev,\n        envelopes: prev.envelopes.filter(e => e.id !== envelope.id),\n        saving: false\n      }));\n    } catch (error) {\n      console.error('Error deleting envelope:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to delete envelope. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Handle adding default envelopes\n  const handleAddDefaults = async () => {\n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      const defaultsWithHouseholdId = DEFAULT_ENVELOPES.map((envelope, index) => ({\n        ...envelope,\n        household_id: householdId,\n        sort_order: index,\n        is_active: true\n      }));\n      \n      const { data, error } = await supabase\n        .from('envelopes')\n        .insert(defaultsWithHouseholdId)\n        .select();\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => ({\n        ...prev,\n        envelopes: [...prev.envelopes, ...data],\n        saving: false\n      }));\n    } catch (error) {\n      console.error('Error adding default envelopes:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to add default envelopes. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Show loading state\n  if (userLoading || state.loading) {\n    return (\n      <div className=\"flex justify-center items-center h-64\">\n        <Loader2 className=\"w-8 h-8 animate-spin\" />\n      </div>\n    );\n  }\n  \n  // Show error state\n  if (state.error) {\n    return (\n      <Alert variant=\"destructive\">\n        <AlertDescription>{state.error}</AlertDescription>\n      </Alert>\n    );\n  }\n  \n  return (\n    <div className=\"space-y-6\">\n      <div className=\"flex justify-between items-center\">\n        <h2 className=\"text-2xl font-bold\">Spending Envelopes</h2>\n        <div className=\"flex gap-2\">\n          {state.envelopes.length === 0 && (\n            <Button onClick={handleAddDefaults} variant=\"outline\">\n              Add Suggested Envelopes\n            </Button>\n          )}\n          <Button onClick={handleAddNew}>\n            Add New Envelope\n          </Button>\n        </div>\n      </div>\n      \n      {state.envelopes.length === 0 && !state.addingNewEnvelope && (\n        <div className=\"text-center p-8 border rounded-md bg-muted/20\">\n          <p className=\"text-muted-foreground\">No envelopes yet. Add your first envelope or use our suggested defaults.</p>\n        </div>\n      )}\n      \n      {/* Show form when adding or editing */}\n      {(state.addingNewEnvelope || state.editingEnvelope) && (\n        <EnvelopeForm\n          envelope={state.editingEnvelope}\n          householdId={householdId}\n          onSave={handleSave}\n          onCancel={handleCancel}\n          saving={state.saving}\n        />\n      )}\n      \n      {/* Show envelope cards when not adding/editing */}\n      {!state.addingNewEnvelope && !state.editingEnvelope && (\n        <div className=\"space-y-4\">\n          {state.envelopes.map(envelope => (\n            <EnvelopeSummaryCard\n              key={envelope.id}\n              envelope={envelope}\n              onEdit={() => handleEdit(envelope)}\n              onDelete={() => handleDelete(envelope)}\n            />\n          ))}\n        </div>\n      )}\n      \n      {/* Help text */}\n      <div className=\"mt-8 p-4 bg-muted/20 rounded-md\">\n        <h3 className=\"font-medium mb-2\">About Spending Envelopes</h3>\n        <p className=\"text-sm text-muted-foreground mb-2\">\n          Envelopes are spending categories for day-to-day expenses. Each envelope gets a set amount per paycheck period.\n        </p>\n        <p className=\"text-sm text-muted-foreground\">\n          <strong>Note:</strong> Savings goals (like Emergency Fund or Vacation) should be created in the next step, not as envelopes.\n        </p>\n      </div>\n    </div>\n  );\n}\n```",
+        "testStrategy": "1. Integration test the StepEnvelopes component:\n   - Test loading envelopes from the database\n   - Test adding a new envelope\n   - Test editing an existing envelope\n   - Test deleting an envelope\n   - Test adding default envelopes\n2. Test error handling for API failures\n3. Test state transitions between viewing, adding, and editing modes\n4. Verify data persistence across step navigation\n5. Test performance with a large number of envelopes\n6. Test responsive layout on different screen sizes",
+        "priority": "medium",
         "dependencies": [
-          2,
+          1,
+          3,
           4
         ],
-        "priority": "high",
-        "details": "1. Update envelope UI components to match income/expense patterns:\n   - Implement summary cards displaying allocation amounts\n   - Create consistent Add/Edit/Delete operations following established patterns\n   - Design UI for configuring rollover rules\n2. Integrate with budget setup flow state management:\n   - Connect envelope operations to existing state management system\n   - Ensure seamless data flow between budget setup and envelope management\n3. Create an EnvelopeManager class to handle envelope operations\n4. Implement methods for:\n   - Creating and modifying envelopes\n   - Tracking real-time balances\n   - Handling different rollover behaviors\n   - Transferring money between envelopes\n5. Use the Strategy pattern for different rollover behaviors\n6. Implement a pub/sub system using RxJS v7.8.1 for real-time updates\n7. Create an OverspendingMonitor to detect and alert on overspending\n8. Use Immer v10.0.2 for immutable state updates",
-        "testStrategy": "Create unit tests for EnvelopeManager and OverspendingMonitor. Include tests for different rollover scenarios and overspending situations. Use RxJS TestScheduler for testing asynchronous behavior. Test UI components for proper integration with state management and consistent behavior with income/expense patterns.",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 6,
-        "title": "Develop Fixed Items Management",
-        "description": "Implement the system for managing fixed items (recurring expenses) with known due dates and variable amounts.",
-        "details": "1. Create a FixedItemManager class to handle fixed item operations\n2. Implement methods for:\n   - Creating and modifying fixed items\n   - Scheduling fixed items for relevant paycheck periods\n   - Adjusting estimated amounts to actual bill amounts\n3. Use a priority queue for scheduling fixed items based on due dates\n4. Implement a BillEstimator using simple moving average for variable bills\n5. Use date-fns v2.30.0 for date-based calculations\n6. Implement a notification system for upcoming due dates using node-schedule v2.1.1",
-        "testStrategy": "Write unit tests for FixedItemManager and BillEstimator. Include tests for scheduling logic, estimation accuracy, and notification timing. Mock date-fns and node-schedule for predictable testing.",
-        "priority": "high",
+        "title": "Create Savings Goal Summary Card Component",
+        "description": "Develop the SavingsGoalSummaryCard component that displays savings goal information with progress tracking and edit/delete actions.",
+        "details": "Create a new component that displays savings goal information with progress tracking:\n\n```typescript\n// src/components/budget-setup/savings-goal-summary-card.tsx\nimport { Button } from \"@/components/ui/button\";\nimport { Card } from \"@/components/ui/card\";\nimport { Progress } from \"@/components/ui/progress\";\nimport { formatCurrency } from \"@/lib/utils\";\nimport { ShieldCheck } from \"lucide-react\";\n\ninterface SavingsGoalSummaryCardProps {\n  goal: {\n    id: string;\n    name: string;\n    target_amount: number;\n    current_balance: number;\n    target_date?: string;\n    is_emergency_fund: boolean;\n  };\n  onEdit: () => void;\n  onDelete: () => void;\n}\n\nexport function SavingsGoalSummaryCard({ goal, onEdit, onDelete }: SavingsGoalSummaryCardProps) {\n  // Calculate progress percentage\n  const progressPercentage = goal.target_amount > 0\n    ? Math.min(Math.round((goal.current_balance / goal.target_amount) * 100), 100)\n    : 0;\n  \n  // Format target date if present\n  const formattedDate = goal.target_date\n    ? new Date(goal.target_date).toLocaleDateString()\n    : null;\n  \n  return (\n    <Card className=\"p-4 mb-4\">\n      <div className=\"space-y-3\">\n        <div className=\"flex justify-between items-center\">\n          <div className=\"flex items-center gap-2\">\n            {goal.is_emergency_fund && (\n              <ShieldCheck className=\"h-5 w-5 text-primary\" />\n            )}\n            <h3 className=\"font-medium\">{goal.name}</h3>\n          </div>\n          <div className=\"flex gap-2\">\n            <Button size=\"sm\" variant=\"outline\" onClick={onEdit}>Edit</Button>\n            <Button size=\"sm\" variant=\"destructive\" onClick={onDelete}>Delete</Button>\n          </div>\n        </div>\n        \n        <div className=\"space-y-1\">\n          <div className=\"flex justify-between text-sm\">\n            <span>Progress: {formatCurrency(goal.current_balance)} of {formatCurrency(goal.target_amount)}</span>\n            <span>{progressPercentage}%</span>\n          </div>\n          <Progress value={progressPercentage} className=\"h-2\" />\n        </div>\n        \n        {formattedDate && (\n          <p className=\"text-xs text-muted-foreground\">\n            Target date: {formattedDate}\n          </p>\n        )}\n        \n        {goal.is_emergency_fund && (\n          <p className=\"text-xs text-primary\">\n            Emergency Fund\n          </p>\n        )}\n      </div>\n    </Card>\n  );\n}\n```",
+        "testStrategy": "1. Unit test the SavingsGoalSummaryCard component:\n   - Verify it renders correctly with all goal data\n   - Test progress calculation and display\n   - Test emergency fund indicator display\n   - Test target date formatting\n   - Verify edit and delete buttons trigger the correct callbacks\n2. Visual regression tests to ensure the card matches the established UI pattern\n3. Accessibility testing for proper contrast, focus states, and screen reader support\n4. Test edge cases like 0% progress, 100% progress, and missing target date",
+        "priority": "medium",
         "dependencies": [
-          2,
-          4
+          1
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 7,
-        "title": "Implement Vaults System",
-        "description": "Phase 1: Modernize Savings Goals Step - Update the UI to match established patterns and implement comprehensive vault management functionality.",
-        "status": "in-progress",
+        "title": "Create Savings Goal Form Component",
+        "description": "Develop the SavingsGoalForm component for adding and editing savings goals with proper validation and user guidance.",
+        "details": "Create a form component for adding and editing savings goals with validation:\n\n```typescript\n// src/components/budget-setup/savings-goal-form.tsx\nimport { zodResolver } from \"@zodResolver/form\";\nimport { useForm } from \"react-hook-form\";\nimport { z } from \"zod\";\nimport { Button } from \"@/components/ui/button\";\nimport { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from \"@/components/ui/form\";\nimport { Input } from \"@/components/ui/input\";\nimport { Checkbox } from \"@/components/ui/checkbox\";\nimport { Loader2 } from \"lucide-react\";\n\n// Validation schema\nconst savingsGoalSchema = z.object({\n  id: z.string().optional(),\n  name: z.string().min(1, \"Name is required\"),\n  target_amount: z.coerce.number().positive(\"Target amount must be greater than 0\"),\n  current_balance: z.coerce.number().min(0, \"Current balance cannot be negative\"),\n  target_date: z.string().optional().nullable(),\n  is_emergency_fund: z.boolean().default(false),\n  household_id: z.string()\n});\n\ntype SavingsGoalFormValues = z.infer<typeof savingsGoalSchema>;\n\ninterface SavingsGoalFormProps {\n  goal?: SavingsGoalFormValues;\n  householdId: string;\n  onSave: (goal: SavingsGoalFormValues) => void;\n  onCancel: () => void;\n  saving: boolean;\n}\n\nexport function SavingsGoalForm({ goal, householdId, onSave, onCancel, saving }: SavingsGoalFormProps) {\n  // Default values\n  const defaultValues: Partial<SavingsGoalFormValues> = {\n    name: \"\",\n    target_amount: 0,\n    current_balance: 0,\n    target_date: null,\n    is_emergency_fund: false,\n    household_id: householdId,\n    ...goal\n  };\n\n  const form = useForm<SavingsGoalFormValues>({\n    resolver: zodResolver(savingsGoalSchema),\n    defaultValues,\n  });\n\n  // Handle form submission\n  const onSubmit = (values: SavingsGoalFormValues) => {\n    // If target date is empty string, set to null\n    if (values.target_date === \"\") {\n      values.target_date = null;\n    }\n    onSave(values);\n  };\n\n  return (\n    <Form {...form}>\n      <form onSubmit={form.handleSubmit(onSubmit)} className=\"space-y-6\">\n        <FormField\n          control={form.control}\n          name=\"name\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Goal Name</FormLabel>\n              <FormControl>\n                <Input placeholder=\"Emergency Fund\" {...field} />\n              </FormControl>\n              <FormDescription>\n                Name for this savings goal (e.g., Emergency Fund, Vacation)\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"target_amount\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Target Amount</FormLabel>\n              <FormControl>\n                <Input type=\"number\" min=\"0\" step=\"0.01\" {...field} />\n              </FormControl>\n              <FormDescription>\n                Total amount you want to save for this goal\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"current_balance\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Current Balance</FormLabel>\n              <FormControl>\n                <Input type=\"number\" min=\"0\" step=\"0.01\" {...field} />\n              </FormControl>\n              <FormDescription>\n                How much you've already saved toward this goal\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"target_date\"\n          render={({ field }) => (\n            <FormItem>\n              <FormLabel>Target Date (Optional)</FormLabel>\n              <FormControl>\n                <Input type=\"date\" {...field} value={field.value || ''} />\n              </FormControl>\n              <FormDescription>\n                When you want to reach this savings goal\n              </FormDescription>\n              <FormMessage />\n            </FormItem>\n          )}\n        />\n\n        <FormField\n          control={form.control}\n          name=\"is_emergency_fund\"\n          render={({ field }) => (\n            <FormItem className=\"flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4\">\n              <FormControl>\n                <Checkbox\n                  checked={field.value}\n                  onCheckedChange={field.onChange}\n                />\n              </FormControl>\n              <div className=\"space-y-1 leading-none\">\n                <FormLabel>\n                  This is an emergency fund\n                </FormLabel>\n                <FormDescription>\n                  Emergency funds are prioritized and should be funded before other goals\n                </FormDescription>\n              </div>\n            </FormItem>\n          )}\n        />\n\n        <div className=\"flex gap-2\">\n          <Button type=\"submit\" disabled={saving}>\n            {saving ? <Loader2 className=\"w-4 h-4 mr-2 animate-spin\" /> : null}\n            Save\n          </Button>\n          <Button type=\"button\" variant=\"outline\" onClick={onCancel}>\n            Cancel\n          </Button>\n        </div>\n      </form>\n    </Form>\n  );\n}\n```",
+        "testStrategy": "1. Unit test the SavingsGoalForm component:\n   - Test form validation for required fields\n   - Test form submission with correct values\n   - Test form cancellation\n   - Test emergency fund checkbox functionality\n2. Integration test with mock API calls\n3. Test form behavior with different initial values\n4. Verify proper handling of loading states during save operations\n5. Test form accessibility including keyboard navigation and screen reader support\n6. Test date input formatting and validation",
+        "priority": "medium",
         "dependencies": [
-          2,
-          4
+          1
         ],
-        "priority": "high",
-        "details": "1. Update UI to match established design patterns:\n   - Implement summary cards with progress indicators for each vault\n   - Create configuration interface for target amounts and dates\n   - Build UI for emergency fund prioritization handling\n   - Implement full Add/Edit/Delete operations with comprehensive form validation\n\n2. Backend vault system implementation:\n   - Create a VaultManager class to handle vault operations\n   - Implement methods for creating, modifying, and deleting vaults\n   - Track progress towards goals with visual indicators\n   - Handle automatic contributions (fixed and variable)\n\n3. Implement specific vault types:\n   - Emergency Fund with prioritization logic\n   - General Savings with flexible goals\n   - Roundup Vault for spare change collection\n   - Big Ticket Items with milestone tracking\n\n4. Use the Strategy pattern for different contribution strategies\n5. Implement a GoalTracker to monitor progress and provide insights\n6. Use Chart.js v4.3.0 for visualizing progress towards goals in summary cards",
-        "testStrategy": "Create unit tests for VaultManager and GoalTracker. Include tests for different contribution scenarios, goal tracking accuracy, visualization data generation, and form validation. Test UI components for proper rendering of summary cards, progress indicators, and CRUD operations.",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 8,
-        "title": "Implement User Authentication and Authorization",
-        "description": "Develop a secure authentication and authorization system with role-based access control.",
-        "details": "1. Use Firebase Authentication v9.22.2 for user authentication\n2. Implement JWT-based authentication flow\n3. Create UserManager class for handling user operations\n4. Implement role-based access control (RBAC) using Casbin v5.26.1\n5. Define roles: Primary User, Secondary User, Admin (for future multi-tenant support)\n6. Implement middleware for route protection based on user roles\n7. Use bcrypt v5.1.0 for password hashing\n8. Implement secure session management using express-session v1.17.3\n9. Set up proper CORS configuration",
-        "testStrategy": "Write unit tests for UserManager and RBAC logic. Implement integration tests for authentication flow. Use Jest's mocking capabilities to test Firebase Authentication integration.",
-        "priority": "high",
+        "title": "Implement Savings Goals Step Integration",
+        "description": "Update the StepSavingsGoals component to use the new SavingsGoalSummaryCard and SavingsGoalForm components with proper state management and API integration.",
+        "details": "Implement the StepSavingsGoals component that integrates the new savings goal components with proper state management and API calls:\n\n```typescript\n// src/components/budget-setup/step-savings-goals.tsx\nimport { useState, useEffect } from \"react\";\nimport { useUser } from \"@/hooks/useUser\";\nimport { Button } from \"@/components/ui/button\";\nimport { SavingsGoalSummaryCard } from \"./savings-goal-summary-card\";\nimport { SavingsGoalForm } from \"./savings-goal-form\";\nimport { supabase } from \"@/lib/supabase\";\nimport { Loader2 } from \"lucide-react\";\nimport { Alert, AlertDescription } from \"@/components/ui/alert\";\n\n// Default savings goals\nconst DEFAULT_SAVINGS_GOALS = [\n  { name: \"Emergency Fund\", target_amount: 10000, current_balance: 0, is_emergency_fund: true },\n  { name: \"Vacation\", target_amount: 2000, current_balance: 0, is_emergency_fund: false },\n  { name: \"Car Replacement\", target_amount: 5000, current_balance: 0, is_emergency_fund: false }\n];\n\nexport function StepSavingsGoals() {\n  const { user, householdId, loading: userLoading } = useUser();\n  \n  const [state, setState] = useState({\n    goals: [],\n    editingGoal: null,\n    addingNewGoal: false,\n    loading: true,\n    saving: false,\n    error: null\n  });\n  \n  // Load savings goals on component mount\n  useEffect(() => {\n    if (householdId) {\n      loadSavingsGoals();\n    }\n  }, [householdId]);\n  \n  // Load savings goals from database\n  const loadSavingsGoals = async () => {\n    setState(prev => ({ ...prev, loading: true, error: null }));\n    \n    try {\n      const { data, error } = await supabase\n        .from('savings_goals')\n        .select('*')\n        .eq('household_id', householdId)\n        .eq('is_active', true)\n        .order('sort_order');\n      \n      if (error) throw error;\n      \n      setState(prev => ({\n        ...prev,\n        goals: data || [],\n        loading: false\n      }));\n    } catch (error) {\n      console.error('Error loading savings goals:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to load savings goals. Please try again.',\n        loading: false\n      }));\n    }\n  };\n  \n  // Handle adding a new savings goal\n  const handleAddNew = () => {\n    setState(prev => ({\n      ...prev,\n      addingNewGoal: true,\n      editingGoal: null\n    }));\n  };\n  \n  // Handle editing a savings goal\n  const handleEdit = (goal) => {\n    setState(prev => ({\n      ...prev,\n      editingGoal: goal,\n      addingNewGoal: false\n    }));\n  };\n  \n  // Handle canceling add/edit\n  const handleCancel = () => {\n    setState(prev => ({\n      ...prev,\n      editingGoal: null,\n      addingNewGoal: false\n    }));\n  };\n  \n  // Handle saving a savings goal\n  const handleSave = async (goal) => {\n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      // Add household_id if not present\n      if (!goal.household_id) {\n        goal.household_id = householdId;\n      }\n      \n      // Add sort_order if new goal\n      if (!goal.id) {\n        goal.sort_order = state.goals.length;\n        goal.is_active = true;\n      }\n      \n      const { data, error } = await supabase\n        .from('savings_goals')\n        .upsert(goal)\n        .select()\n        .single();\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => {\n        const updatedGoals = goal.id\n          ? prev.goals.map(g => g.id === goal.id ? data : g)\n          : [...prev.goals, data];\n        \n        return {\n          ...prev,\n          goals: updatedGoals,\n          editingGoal: null,\n          addingNewGoal: false,\n          saving: false\n        };\n      });\n    } catch (error) {\n      console.error('Error saving savings goal:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to save savings goal. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Handle deleting a savings goal\n  const handleDelete = async (goal) => {\n    if (!confirm('Are you sure you want to delete this savings goal?')) return;\n    \n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      const { error } = await supabase\n        .from('savings_goals')\n        .update({ is_active: false })\n        .eq('id', goal.id);\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => ({\n        ...prev,\n        goals: prev.goals.filter(g => g.id !== goal.id),\n        saving: false\n      }));\n    } catch (error) {\n      console.error('Error deleting savings goal:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to delete savings goal. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Handle adding default savings goals\n  const handleAddDefaults = async () => {\n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      const defaultsWithHouseholdId = DEFAULT_SAVINGS_GOALS.map((goal, index) => ({\n        ...goal,\n        household_id: householdId,\n        sort_order: index,\n        is_active: true\n      }));\n      \n      const { data, error } = await supabase\n        .from('savings_goals')\n        .insert(defaultsWithHouseholdId)\n        .select();\n      \n      if (error) throw error;\n      \n      // Update local state\n      setState(prev => ({\n        ...prev,\n        goals: [...prev.goals, ...data],\n        saving: false\n      }));\n    } catch (error) {\n      console.error('Error adding default savings goals:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to add default savings goals. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Check if there's at least one emergency fund\n  const hasEmergencyFund = state.goals.some(goal => goal.is_emergency_fund);\n  \n  // Show loading state\n  if (userLoading || state.loading) {\n    return (\n      <div className=\"flex justify-center items-center h-64\">\n        <Loader2 className=\"w-8 h-8 animate-spin\" />\n      </div>\n    );\n  }\n  \n  // Show error state\n  if (state.error) {\n    return (\n      <Alert variant=\"destructive\">\n        <AlertDescription>{state.error}</AlertDescription>\n      </Alert>\n    );\n  }\n  \n  return (\n    <div className=\"space-y-6\">\n      <div className=\"flex justify-between items-center\">\n        <h2 className=\"text-2xl font-bold\">Savings Goals</h2>\n        <div className=\"flex gap-2\">\n          {state.goals.length === 0 && (\n            <Button onClick={handleAddDefaults} variant=\"outline\">\n              Add Suggested Goals\n            </Button>\n          )}\n          <Button onClick={handleAddNew}>\n            Add New Goal\n          </Button>\n        </div>\n      </div>\n      \n      {!hasEmergencyFund && state.goals.length > 0 && !state.addingNewGoal && !state.editingGoal && (\n        <Alert>\n          <AlertDescription>\n            We recommend having at least one emergency fund. Add one by clicking \"Add New Goal\".\n          </AlertDescription>\n        </Alert>\n      )}\n      \n      {state.goals.length === 0 && !state.addingNewGoal && (\n        <div className=\"text-center p-8 border rounded-md bg-muted/20\">\n          <p className=\"text-muted-foreground\">No savings goals yet. Add your first goal or use our suggested defaults.</p>\n        </div>\n      )}\n      \n      {/* Show form when adding or editing */}\n      {(state.addingNewGoal || state.editingGoal) && (\n        <SavingsGoalForm\n          goal={state.editingGoal}\n          householdId={householdId}\n          onSave={handleSave}\n          onCancel={handleCancel}\n          saving={state.saving}\n        />\n      )}\n      \n      {/* Show savings goal cards when not adding/editing */}\n      {!state.addingNewGoal && !state.editingGoal && (\n        <div className=\"space-y-4\">\n          {state.goals.map(goal => (\n            <SavingsGoalSummaryCard\n              key={goal.id}\n              goal={goal}\n              onEdit={() => handleEdit(goal)}\n              onDelete={() => handleDelete(goal)}\n            />\n          ))}\n        </div>\n      )}\n      \n      {/* Help text */}\n      <div className=\"mt-8 p-4 bg-muted/20 rounded-md\">\n        <h3 className=\"font-medium mb-2\">About Savings Goals</h3>\n        <p className=\"text-sm text-muted-foreground mb-2\">\n          Savings goals are for long-term saving, not day-to-day spending. Examples include Emergency Fund, Vacation, or Car Replacement.\n        </p>\n        <p className=\"text-sm text-muted-foreground\">\n          <strong>Tip:</strong> We recommend having at least one emergency fund with 3-6 months of expenses as your target.\n        </p>\n      </div>\n    </div>\n  );\n}\n```",
+        "testStrategy": "1. Integration test the StepSavingsGoals component:\n   - Test loading savings goals from the database\n   - Test adding a new savings goal\n   - Test editing an existing savings goal\n   - Test deleting a savings goal\n   - Test adding default savings goals\n   - Test emergency fund detection and alert\n2. Test error handling for API failures\n3. Test state transitions between viewing, adding, and editing modes\n4. Verify data persistence across step navigation\n5. Test performance with a large number of savings goals\n6. Test responsive layout on different screen sizes",
+        "priority": "medium",
         "dependencies": [
-          1
+          1,
+          6,
+          7
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 9,
-        "title": "Develop Transaction Management System",
-        "description": "Implement the dual table system for transaction management, including Plaid integration and manual transaction handling.",
-        "details": "1. Use Plaid API v12.0.0 for bank transaction syncing\n2. Create TransactionManager class for handling all transaction operations\n3. Implement dual table system:\n   - PlaidTransaction for read-only synced transactions\n   - UserTransaction for user-controlled transactions\n4. Implement methods for:\n   - Importing Plaid transactions as pending\n   - Creating manual transactions\n   - Linking manual transactions to Plaid imports\n   - Approving pending transactions\n5. Use RxJS v7.8.1 for reactive updates to transaction status\n6. Implement smart categorization using TensorFlow.js v4.7.0 for AI-suggested envelope assignment\n7. Create a ReviewQueue class for managing pending transactions\n8. Implement roundup logic with configurable options",
-        "testStrategy": "Write unit tests for TransactionManager, covering various transaction scenarios. Mock Plaid API for testing. Implement integration tests for the entire transaction flow. Use TensorFlow.js testing utilities for AI categorization tests.",
-        "priority": "high",
+        "title": "Update Database Schema for Frequency System",
+        "description": "Extend the frequency system to envelopes and savings goals tables for consistency with income sources and fixed expenses.",
+        "details": "Update the database schema to add frequency-related columns to envelopes and savings goals tables:\n\n```sql\n-- Ensure envelopes table supports frequency for recurring allocations\nALTER TABLE envelopes ADD COLUMN IF NOT EXISTS frequency_type text;\nALTER TABLE envelopes ADD COLUMN IF NOT EXISTS frequency_config jsonb;\n\n-- Ensure savings_goals table supports frequency for recurring contributions\nALTER TABLE savings_goals ADD COLUMN IF NOT EXISTS frequency_type text;\nALTER TABLE savings_goals ADD COLUMN IF NOT EXISTS frequency_config jsonb;\n```\n\nImplement the migration in a Supabase migration file:\n\n```typescript\n// src/lib/migrations/extend-frequency-system.ts\nimport { supabase } from \"@/lib/supabase\";\n\nexport async function extendFrequencySystem() {\n  try {\n    // Add frequency columns to envelopes table\n    await supabase.rpc('add_column_if_not_exists', {\n      table_name: 'envelopes',\n      column_name: 'frequency_type',\n      column_type: 'text'\n    });\n    \n    await supabase.rpc('add_column_if_not_exists', {\n      table_name: 'envelopes',\n      column_name: 'frequency_config',\n      column_type: 'jsonb'\n    });\n    \n    // Add frequency columns to savings_goals table\n    await supabase.rpc('add_column_if_not_exists', {\n      table_name: 'savings_goals',\n      column_name: 'frequency_type',\n      column_type: 'text'\n    });\n    \n    await supabase.rpc('add_column_if_not_exists', {\n      table_name: 'savings_goals',\n      column_name: 'frequency_config',\n      column_type: 'jsonb'\n    });\n    \n    console.log('Successfully extended frequency system to envelopes and savings goals');\n    return { success: true };\n  } catch (error) {\n    console.error('Error extending frequency system:', error);\n    return { success: false, error };\n  }\n}\n```\n\nCreate a stored procedure in Supabase for adding columns if they don't exist:\n\n```sql\n-- Create a function to add a column if it doesn't exist\nCREATE OR REPLACE FUNCTION add_column_if_not_exists(\n  table_name text,\n  column_name text,\n  column_type text\n) RETURNS void AS $$\nBEGIN\n  IF NOT EXISTS (\n    SELECT 1\n    FROM information_schema.columns\n    WHERE table_name = $1\n    AND column_name = $2\n  ) THEN\n    EXECUTE format('ALTER TABLE %I ADD COLUMN %I %s', $1, $2, $3);\n  END IF;\nEND;\n$$ LANGUAGE plpgsql SECURITY DEFINER;\n```\n\nUpdate the frequency-related types to include these new tables:\n\n```typescript\n// src/types/frequency.ts\nexport type FrequencyType = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'annual' | 'custom';\n\nexport interface FrequencyConfig {\n  custom_type?: 'days' | 'weeks' | 'months';\n  custom_interval?: number;\n  start_date?: string;\n  day_of_month?: number;\n  day_of_week?: number;\n}\n\nexport interface FrequencyItem {\n  frequency_type: FrequencyType;\n  frequency_config: FrequencyConfig;\n}\n```",
+        "testStrategy": "1. Test the migration script in a development environment before running in production\n2. Verify that existing data is not affected by the schema changes\n3. Test the add_column_if_not_exists function with various table and column combinations\n4. Verify that the new columns are properly created in both tables\n5. Test inserting and querying data with the new frequency columns\n6. Create a rollback plan in case the migration fails",
+        "priority": "low",
         "dependencies": [
-          2,
-          5,
-          6,
-          7
+          1
         ],
-        "status": "in-progress",
+        "status": "pending",
         "subtasks": []
       },
       {
         "id": 10,
-        "title": "Implement Cash Flow and Planning Features",
-        "description": "Develop features for cash flow management, including bill tracking, paycheck period forecasting, and trend analysis.",
-        "details": "1. Create a CashFlowManager class for handling cash flow operations\n2. Implement methods for:\n   - Tracking upcoming bills and due dates\n   - Forecasting paycheck periods\n   - Analyzing spending trends over time\n3. Use date-fns v2.30.0 for date manipulations\n4. Implement a BillTracker class for managing upcoming bills\n5. Create a ForecastEngine using simple linear regression for paycheck period forecasting\n6. Use D3.js v7.8.4 for advanced data visualizations\n7. Implement a TrendAnalyzer using moving averages and linear regression\n8. Create a ScenarioPlanner for 'What if' scenario analysis",
-        "testStrategy": "Write unit tests for CashFlowManager, BillTracker, ForecastEngine, and TrendAnalyzer. Use mock data to test various scenarios. Implement visual regression testing for D3.js visualizations using jest-image-snapshot.",
-        "priority": "medium",
-        "dependencies": [
-          3,
-          4,
-          5,
-          6,
-          7,
-          9
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 11,
-        "title": "Develop AI-Powered Features",
-        "description": "Implement AI-powered features for smart emergency handling, impact analysis, spending insights, and personalized tips.",
-        "details": "1. Use TensorFlow.js v4.7.0 for machine learning models\n2. Implement SmartEmergencyHandler for recommending optimal funding sources\n3. Create ImpactAnalyzer for assessing effects of emergency expenses\n4. Develop SpendingPatternAnalyzer for detecting trends and optimization suggestions\n5. Implement BillPredictor using ARIMA model for variable expense estimation\n6. Create BudgetOptimizer using genetic algorithms for allocation strategies\n7. Implement PersonalizedTipGenerator using a content-based recommendation system\n8. Develop CashFlowForecaster using LSTM neural networks\n9. Create GoalAchievementCoach using reinforcement learning\n10. Use Web Workers API for running AI computations in background",
-        "testStrategy": "Implement unit tests for each AI feature. Use pre-defined datasets for testing model accuracy. Implement integration tests to ensure AI features work correctly with other system components. Use TensorFlow.js testing utilities for model validation.",
-        "priority": "medium",
-        "dependencies": [
-          4,
-          5,
-          6,
-          7,
-          9,
-          10
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 12,
-        "title": "Design and Implement User Interface (Mobile-First)",
-        "description": "Create a mobile-first, intuitive user interface for the budget app using React Native.",
-        "details": "1. Use React Native v0.71.8 with TypeScript\n2. Implement responsive layouts using react-native-responsive-screen v1.4.2\n3. Use react-navigation v6.1.6 for app navigation\n4. Implement custom components for envelopes, vaults, and transactions\n5. Use react-native-reanimated v3.3.0 for smooth animations\n6. Implement data visualization components using react-native-svg v13.9.0 and d3.js v7.8.4\n7. Use react-native-gesture-handler v2.12.0 for advanced touch interactions\n8. Implement accessibility features using react-native-accessibility v3.0.0\n9. Use react-native-localize v3.0.0 for internationalization\n10. Implement dark mode support\n11. Use styled-components v6.0.0-rc.3 for component styling",
-        "testStrategy": "Implement unit tests for custom components using react-native-testing-library. Use Detox for end-to-end testing on real devices. Implement visual regression testing using jest-image-snapshot. Test accessibility using react-native-accessibility-engine.",
+        "title": "Implement End-to-End Budget Setup Flow Integration",
+        "description": "Ensure seamless navigation between all budget setup steps with proper data persistence, validation, and completion handling.",
+        "details": "Implement the budget setup flow integration to ensure seamless navigation between steps with proper data persistence:\n\n```typescript\n// src/components/budget-setup/budget-setup-flow.tsx\nimport { useState, useEffect } from \"react\";\nimport { useRouter } from \"next/navigation\";\nimport { useUser } from \"@/hooks/useUser\";\nimport { Button } from \"@/components/ui/button\";\nimport { StepIncome } from \"./step-income\";\nimport { StepFixedExpenses } from \"./step-fixed-expenses\";\nimport { StepEnvelopes } from \"./step-envelopes\";\nimport { StepSavingsGoals } from \"./step-savings-goals\";\nimport { supabase } from \"@/lib/supabase\";\nimport { Loader2 } from \"lucide-react\";\nimport { Alert, AlertDescription } from \"@/components/ui/alert\";\n\nconst STEPS = [\n  { id: 'income', label: 'Income Sources', component: StepIncome },\n  { id: 'expenses', label: 'Fixed Expenses', component: StepFixedExpenses },\n  { id: 'envelopes', label: 'Envelopes', component: StepEnvelopes },\n  { id: 'savings', label: 'Savings Goals', component: StepSavingsGoals }\n];\n\nexport function BudgetSetupFlow() {\n  const router = useRouter();\n  const { user, householdId, loading: userLoading } = useUser();\n  \n  const [state, setState] = useState({\n    currentStepIndex: 0,\n    stepsCompleted: {\n      income: false,\n      expenses: false,\n      envelopes: false,\n      savings: false\n    },\n    loading: true,\n    saving: false,\n    error: null\n  });\n  \n  // Load budget setup progress on component mount\n  useEffect(() => {\n    if (householdId) {\n      loadBudgetSetupProgress();\n    }\n  }, [householdId]);\n  \n  // Load budget setup progress from database\n  const loadBudgetSetupProgress = async () => {\n    setState(prev => ({ ...prev, loading: true, error: null }));\n    \n    try {\n      // Check if each step has data\n      const [incomeResponse, expensesResponse, envelopesResponse, savingsResponse] = await Promise.all([\n        supabase.from('income_sources').select('id').eq('household_id', householdId).eq('is_active', true).limit(1),\n        supabase.from('fixed_expenses').select('id').eq('household_id', householdId).eq('is_active', true).limit(1),\n        supabase.from('envelopes').select('id').eq('household_id', householdId).eq('is_active', true).limit(1),\n        supabase.from('savings_goals').select('id').eq('household_id', householdId).eq('is_active', true).limit(1)\n      ]);\n      \n      // Check for errors\n      if (incomeResponse.error) throw incomeResponse.error;\n      if (expensesResponse.error) throw expensesResponse.error;\n      if (envelopesResponse.error) throw envelopesResponse.error;\n      if (savingsResponse.error) throw savingsResponse.error;\n      \n      // Update completed steps\n      setState(prev => ({\n        ...prev,\n        stepsCompleted: {\n          income: incomeResponse.data.length > 0,\n          expenses: expensesResponse.data.length > 0,\n          envelopes: envelopesResponse.data.length > 0,\n          savings: savingsResponse.data.length > 0\n        },\n        loading: false\n      }));\n      \n      // Find the first incomplete step\n      const firstIncompleteIndex = STEPS.findIndex(step => \n        !prev.stepsCompleted[step.id as keyof typeof prev.stepsCompleted]\n      );\n      \n      // If found, set as current step\n      if (firstIncompleteIndex !== -1) {\n        setState(prev => ({\n          ...prev,\n          currentStepIndex: firstIncompleteIndex\n        }));\n      }\n    } catch (error) {\n      console.error('Error loading budget setup progress:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to load budget setup progress. Please try again.',\n        loading: false\n      }));\n    }\n  };\n  \n  // Handle navigation to next step\n  const handleNext = () => {\n    if (state.currentStepIndex < STEPS.length - 1) {\n      setState(prev => ({\n        ...prev,\n        currentStepIndex: prev.currentStepIndex + 1\n      }));\n    } else {\n      // All steps completed, redirect to dashboard\n      handleComplete();\n    }\n  };\n  \n  // Handle navigation to previous step\n  const handlePrevious = () => {\n    if (state.currentStepIndex > 0) {\n      setState(prev => ({\n        ...prev,\n        currentStepIndex: prev.currentStepIndex - 1\n      }));\n    }\n  };\n  \n  // Handle completion of budget setup\n  const handleComplete = async () => {\n    setState(prev => ({ ...prev, saving: true, error: null }));\n    \n    try {\n      // Update household record to mark budget setup as complete\n      const { error } = await supabase\n        .from('households')\n        .update({ budget_setup_completed: true })\n        .eq('id', householdId);\n      \n      if (error) throw error;\n      \n      // Redirect to dashboard\n      router.push('/dashboard');\n    } catch (error) {\n      console.error('Error completing budget setup:', error);\n      setState(prev => ({\n        ...prev,\n        error: 'Failed to complete budget setup. Please try again.',\n        saving: false\n      }));\n    }\n  };\n  \n  // Show loading state\n  if (userLoading || state.loading) {\n    return (\n      <div className=\"flex justify-center items-center h-64\">\n        <Loader2 className=\"w-8 h-8 animate-spin\" />\n      </div>\n    );\n  }\n  \n  // Show error state\n  if (state.error) {\n    return (\n      <Alert variant=\"destructive\">\n        <AlertDescription>{state.error}</AlertDescription>\n      </Alert>\n    );\n  }\n  \n  // Get current step\n  const currentStep = STEPS[state.currentStepIndex];\n  const CurrentStepComponent = currentStep.component;\n  const isLastStep = state.currentStepIndex === STEPS.length - 1;\n  \n  return (\n    <div className=\"space-y-8\">\n      {/* Progress indicator */}\n      <div className=\"flex justify-between mb-8\">\n        {STEPS.map((step, index) => (\n          <div \n            key={step.id} \n            className={`flex flex-col items-center ${index <= state.currentStepIndex ? 'text-primary' : 'text-muted-foreground'}`}\n          >\n            <div \n              className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${index <= state.currentStepIndex ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}\n            >\n              {index + 1}\n            </div>\n            <span className=\"text-sm\">{step.label}</span>\n          </div>\n        ))}\n      </div>\n      \n      {/* Current step content */}\n      <div>\n        <CurrentStepComponent />\n      </div>\n      \n      {/* Navigation buttons */}\n      <div className=\"flex justify-between pt-8 border-t\">\n        <Button \n          variant=\"outline\" \n          onClick={handlePrevious}\n          disabled={state.currentStepIndex === 0}\n        >\n          Previous\n        </Button>\n        \n        <Button \n          onClick={handleNext}\n          disabled={state.saving}\n        >\n          {state.saving ? <Loader2 className=\"w-4 h-4 mr-2 animate-spin\" /> : null}\n          {isLastStep ? 'Complete Setup' : 'Next'}\n        </Button>\n      </div>\n    </div>\n  );\n}\n```\n\nCreate an API route for checking budget setup completion:\n\n```typescript\n// src/app/api/budget-setup/status/route.ts\nimport { NextResponse } from 'next/server';\nimport { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';\nimport { cookies } from 'next/headers';\n\nexport async function GET(request: Request) {\n  const supabase = createRouteHandlerClient({ cookies });\n  \n  try {\n    // Get user session\n    const { data: { session } } = await supabase.auth.getSession();\n    \n    if (!session) {\n      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });\n    }\n    \n    // Get user's household\n    const { data: householdMember, error: householdError } = await supabase\n      .from('household_members')\n      .select('household_id')\n      .eq('user_id', session.user.id)\n      .single();\n    \n    if (householdError || !householdMember) {\n      return NextResponse.json({ error: 'Household not found' }, { status: 404 });\n    }\n    \n    // Check budget setup status\n    const { data: household, error: statusError } = await supabase\n      .from('households')\n      .select('budget_setup_completed')\n      .eq('id', householdMember.household_id)\n      .single();\n    \n    if (statusError) {\n      return NextResponse.json({ error: 'Failed to check budget setup status' }, { status: 500 });\n    }\n    \n    // Check if each step has data\n    const [incomeResponse, expensesResponse, envelopesResponse, savingsResponse] = await Promise.all([\n      supabase.from('income_sources').select('id').eq('household_id', householdMember.household_id).eq('is_active', true).limit(1),\n      supabase.from('fixed_expenses').select('id').eq('household_id', householdMember.household_id).eq('is_active', true).limit(1),\n      supabase.from('envelopes').select('id').eq('household_id', householdMember.household_id).eq('is_active', true).limit(1),\n      supabase.from('savings_goals').select('id').eq('household_id', householdMember.household_id).eq('is_active', true).limit(1)\n    ]);\n    \n    return NextResponse.json({\n      budgetSetupCompleted: household.budget_setup_completed,\n      stepsCompleted: {\n        income: incomeResponse.data.length > 0,\n        expenses: expensesResponse.data.length > 0,\n        envelopes: envelopesResponse.data.length > 0,\n        savings: savingsResponse.data.length > 0\n      }\n    });\n  } catch (error) {\n    console.error('Error checking budget setup status:', error);\n    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });\n  }\n}\n```",
+        "testStrategy": "1. End-to-end test the complete budget setup flow:\n   - Test navigation between all steps\n   - Verify data persistence across step navigation\n   - Test completion of the setup process\n   - Verify redirect to dashboard after completion\n2. Test progress tracking:\n   - Verify the progress indicator shows the correct step\n   - Test that completed steps are properly tracked\n   - Test resuming from the first incomplete step\n3. Test error handling:\n   - Test recovery from API failures\n   - Test handling of missing household context\n4. Test responsive layout on different screen sizes\n5. Performance testing with realistic data volumes\n6. Accessibility testing for the entire flow",
         "priority": "high",
         "dependencies": [
           1,
           2,
-          3,
-          4,
           5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11
-        ],
-        "status": "in-progress",
-        "subtasks": []
-      },
-      {
-        "id": 13,
-        "title": "Implement Multi-User Support",
-        "description": "Develop features for multi-user support, including shared budget visibility and individual vs. joint views.",
-        "details": "1. Extend UserManager to support multiple users per budget\n2. Implement SharedBudgetManager for managing shared budgets\n3. Create ViewManager for handling individual vs. joint views\n4. Use Redux v4.2.1 with Redux Toolkit v1.9.5 for state management\n5. Implement real-time updates using Socket.IO v4.6.2\n6. Create ActivityLogger for tracking user actions\n7. Implement fine-grained permissions using Casbin v5.26.1\n8. Use JSON Web Tokens (jwt v9.0.0) for secure data sharing between users\n9. Implement conflict resolution for simultaneous edits",
-        "testStrategy": "Write unit tests for SharedBudgetManager and ViewManager. Implement integration tests for multi-user scenarios. Use Jest's fake timers for testing real-time updates. Test conflict resolution with various edge cases.",
-        "priority": "medium",
-        "dependencies": [
-          8,
-          12
-        ],
-        "status": "in-progress",
-        "subtasks": []
-      },
-      {
-        "id": 14,
-        "title": "Implement Scalable Backend Architecture",
-        "description": "Develop a scalable backend architecture to support future SaaS capabilities and multi-tenant support.",
-        "details": "1. Use Node.js v18.16.0 with Express.js v4.18.2\n2. Implement a microservices architecture using Docker v24.0.2 and Kubernetes v1.27.2\n3. Use MongoDB v6.0.6 with Mongoose v7.3.0 for database\n4. Implement database sharding for horizontal scaling\n5. Use Redis v7.0.11 for caching and session management\n6. Implement API Gateway using Kong v3.3.0\n7. Use Elasticsearch v8.8.0 for efficient data querying and analytics\n8. Implement message queue using RabbitMQ v3.12.0 for asynchronous processing\n9. Use Prometheus v2.44.0 and Grafana v9.5.2 for monitoring and alerting\n10. Implement CI/CD pipeline using Jenkins v2.401.1",
-        "testStrategy": "Implement unit tests for each microservice. Use integration tests to ensure proper communication between services. Implement load testing using k6. Use Docker Compose for local testing of the entire system.",
-        "priority": "medium",
-        "dependencies": [
-          1,
-          8,
-          13
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 15,
-        "title": "Implement Data Synchronization and Offline Support",
-        "description": "Develop a robust data synchronization system and implement offline support for the mobile app.",
-        "details": "1. Use Redux Offline v2.6.0 for offline data management\n2. Implement a custom sync engine using CRDTs (Conflict-free Replicated Data Types)\n3. Use AsyncStorage v1.18.2 for local data persistence\n4. Implement optimistic UI updates for better user experience\n5. Use workbox-react-native v7.0.0 for service worker management\n6. Implement background sync using react-native-background-fetch v4.1.10\n7. Use react-native-netinfo v9.3.10 for network status monitoring\n8. Implement data compression using pako v2.1.0 for efficient data transfer\n9. Use JSON Patch (RFC 6902) for efficient delta updates\n10. Implement retry mechanism with exponential backoff for failed syncs",
-        "testStrategy": "Write unit tests for the sync engine and offline storage mechanisms. Implement integration tests simulating various network conditions. Use Jest's fakeTimers for testing sync intervals and retry mechanisms.",
-        "priority": "medium",
-        "dependencies": [
-          9,
-          12,
-          14
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 16,
-        "title": "Implement Advanced Security Measures",
-        "description": "Develop and implement advanced security measures to protect user data and ensure compliance with financial regulations.",
-        "details": "1. Implement end-to-end encryption using libsodium-wrappers v0.7.11\n2. Use OWASP ZAP v2.12.0 for automated security testing\n3. Implement two-factor authentication using speakeasy v2.0.0\n4. Use helmet v7.0.0 for setting secure HTTP headers\n5. Implement rate limiting using express-rate-limit v6.7.0\n6. Use csurf v1.11.0 for CSRF protection\n7. Implement secure session management using express-session v1.17.3\n8. Use node-vault v0.10.2 for secrets management\n9. Implement SQL injection protection using parameterized queries\n10. Use snyk v1.1130.0 for dependency vulnerability scanning",
-        "testStrategy": "Conduct regular penetration testing. Implement unit tests for security-related functions. Use automated security scanning tools in the CI/CD pipeline. Perform regular security audits.",
-        "priority": "high",
-        "dependencies": [
-          8,
-          14
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 17,
-        "title": "Implement Analytics and Reporting",
-        "description": "Develop comprehensive analytics and reporting features for user insights and business intelligence.",
-        "details": "1. Use Google Analytics v4 for user behavior tracking\n2. Implement custom event tracking using Segment v4.15.0\n3. Use Apache Superset v2.1.0 for creating interactive dashboards\n4. Implement data warehousing using Amazon Redshift\n5. Use Apache Airflow v2.6.1 for ETL processes\n6. Implement real-time analytics using Apache Kafka v3.4.0 and Apache Flink v1.17.0\n7. Use TensorFlow.js v4.7.0 for predictive analytics\n8. Implement A/B testing framework using Optimizely v4.9.4\n9. Use OpenTelemetry v1.14.0 for distributed tracing\n10. Implement custom reporting using Puppeteer v20.7.2 for PDF generation",
-        "testStrategy": "Write unit tests for analytics data processing functions. Implement integration tests for the entire analytics pipeline. Use synthetic data for testing various reporting scenarios. Implement visual regression testing for generated reports and dashboards.",
-        "priority": "low",
-        "dependencies": [
-          9,
-          10,
-          11,
-          14
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 18,
-        "title": "Implement Notification System",
-        "description": "Develop a comprehensive notification system for alerts, reminders, and personalized communications.",
-        "details": "1. Use Firebase Cloud Messaging v9.22.2 for push notifications\n2. Implement in-app notifications using react-native-notifications v4.3.3\n3. Use SendGrid v7.7.0 for email notifications\n4. Implement SMS notifications using Twilio v4.12.0\n5. Create NotificationManager for centralized notification handling\n6. Implement notification preferences and user-defined rules\n7. Use node-schedule v2.1.1 for scheduling notifications\n8. Implement notification grouping and summarization\n9. Use handlebars v4.7.7 for email templates\n10. Implement rich notifications with custom actions",
-        "testStrategy": "Write unit tests for NotificationManager and notification generation logic. Implement integration tests for each notification channel. Use mocks for external services (FCM, SendGrid, Twilio). Test notification delivery under various device states and network conditions.",
-        "priority": "medium",
-        "dependencies": [
-          9,
-          10,
-          11,
-          12,
-          15
-        ],
-        "status": "in-progress",
-        "subtasks": []
-      },
-      {
-        "id": 19,
-        "title": "Implement Localization and Internationalization",
-        "description": "Develop features for supporting multiple languages and regional settings in the app.",
-        "details": "1. Use react-i18next v13.0.0 for internationalization\n2. Implement right-to-left (RTL) layout support\n3. Use moment-timezone v0.5.43 for handling different time zones\n4. Implement number and currency formatting using Intl API\n5. Create a LanguageManager for handling language switching\n6. Use i18n-iso-countries v7.6.0 for country data\n7. Implement locale-specific date formatting\n8. Use react-native-localize v3.0.0 for detecting device locale\n9. Implement a translation management system using Crowdin\n10. Create guidelines for translators to maintain consistency",
-        "testStrategy": "Write unit tests for LanguageManager and formatting functions. Implement integration tests for language switching and RTL layout. Use visual regression testing to ensure proper rendering in different languages. Test with various locales and regional settings.",
-        "priority": "low",
-        "dependencies": [
-          12
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 20,
-        "title": "Implement Performance Optimization and Testing",
-        "description": "Conduct comprehensive performance optimization and implement thorough testing strategies.",
-        "details": "1. Use React DevTools Profiler for component performance analysis\n2. Implement code splitting using React.lazy and Suspense\n3. Use react-window v1.8.9 for efficient list rendering\n4. Implement memoization using React.memo and useMemo\n5. Use Lighthouse for web performance auditing\n6. Implement server-side rendering using Next.js v13.4.6 for web version\n7. Use WebPageTest for performance testing\n8. Implement bundle size analysis using source-map-explorer v2.5.3\n9. Use React Native Flipper v0.201.0 for mobile app debugging\n10. Implement E2E testing using Detox v20.9.0 for React Native\n11. Use Jest v29.5.0 and React Testing Library v14.0.0 for unit and integration testing\n12. Implement visual regression testing using Percy\n13. Use Sentry v7.54.0 for error tracking and performance monitoring",
-        "testStrategy": "Implement comprehensive unit tests for all components and functions. Use integration tests to ensure proper interaction between different parts of the app. Conduct regular performance audits using Lighthouse and WebPageTest. Implement visual regression tests for all key screens and components.",
-        "priority": "high",
-        "dependencies": [
-          12,
-          14,
-          15,
-          16
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 21,
-        "title": "Phase 1: Complete Budget Setup Flow Integration",
-        "description": "Conduct end-to-end testing of the entire budget setup wizard, ensuring smooth navigation between all four steps (Income, Expenses, Envelopes, Savings Goals), proper data persistence, and robust state management.",
-        "details": "1. Implement comprehensive integration testing for the budget setup wizard flow\n2. Test navigation between Income Setup, Expenses Configuration, Envelope Creation, and Savings Goals steps\n3. Verify data persistence across all wizard steps using AsyncStorage or SQLite\n4. Implement state management validation using Redux or Context API\n5. Test form validation and error handling at each step\n6. Verify proper data flow between components and ensure no data loss during navigation\n7. Implement rollback functionality for incomplete wizard sessions\n8. Test wizard completion and final budget creation process\n9. Validate that all user inputs are properly sanitized and stored\n10. Implement progress tracking and step completion indicators\n11. Test wizard behavior under various device states (low memory, network interruption)\n12. Ensure proper cleanup of temporary data on wizard cancellation\n13. Implement accessibility testing for the entire wizard flow\n14. Test responsive design across different screen sizes and orientations\n15. Validate integration with existing budget management systems",
-        "testStrategy": "Create automated end-to-end tests using Detox to simulate complete wizard flows from start to finish. Implement unit tests for each wizard step component and state management logic. Test data persistence by interrupting the wizard at various points and verifying data recovery. Use React Native Testing Library to test component interactions and form validations. Implement visual regression testing for all wizard screens using jest-image-snapshot. Test accessibility compliance using react-native-accessibility-engine. Conduct manual testing on multiple devices to verify responsive design and performance. Test error scenarios including network failures, validation errors, and incomplete data submissions. Verify proper integration with backend services and data synchronization.",
-        "status": "pending",
-        "dependencies": [
-          4,
-          6
-        ],
-        "priority": "medium",
-        "subtasks": []
-      },
-      {
-        "id": 22,
-        "title": "Phase 2: Budget Management",
-        "description": "Implement core budget management logic, including paycheck period creation, zero-based budget calculations, and enhanced category management. This corresponds to Phase 2 (Weeks 3-4) in the PRD.",
-        "details": "1. Enhance PaycheckPeriodManager to support advanced period management:\n   - Implement automatic period rollover with budget reset functionality\n   - Add support for irregular income periods and manual adjustments\n   - Create period comparison and historical analysis features\n   - Implement period-based budget templates and presets\n\n2. Develop zero-based budgeting engine:\n   - Create BudgetCalculator class for zero-based budget calculations\n   - Implement income allocation algorithms ensuring every dollar is assigned\n   - Add validation to prevent over-allocation and enforce budget balance\n   - Create budget variance tracking and reporting functionality\n\n3. Enhanced category management system:\n   - Extend existing envelope and vault categories with subcategories\n   - Implement category hierarchy with parent-child relationships\n   - Add category-based spending analytics and trend analysis\n   - Create category templates for quick budget setup\n\n4. Budget optimization features:\n   - Implement budget recommendation engine based on spending patterns\n   - Add automatic category rebalancing suggestions\n   - Create budget health scoring and improvement recommendations\n   - Implement seasonal budget adjustments and planning tools\n\n5. Integration with existing systems:\n   - Enhance EnvelopeManager integration for advanced envelope operations\n   - Extend VaultManager for goal-based budget allocation\n   - Integrate with existing data models for seamless data flow\n   - Implement real-time budget updates and synchronization\n\n6. Advanced budget reporting:\n   - Create comprehensive budget vs. actual reporting\n   - Implement budget forecasting and projection features\n   - Add export functionality for budget data and reports\n   - Create visual budget dashboards and progress tracking",
-        "testStrategy": "1. Unit Testing:\n   - Test BudgetCalculator for accurate zero-based calculations and edge cases\n   - Verify PaycheckPeriodManager enhancements with various period scenarios\n   - Test category management operations including hierarchy creation and validation\n   - Validate budget optimization algorithms with different spending patterns\n\n2. Integration Testing:\n   - Test seamless integration with existing EnvelopeManager and VaultManager\n   - Verify data flow between budget management and existing data models\n   - Test real-time synchronization and update mechanisms\n   - Validate budget template and preset functionality\n\n3. Performance Testing:\n   - Test budget calculation performance with large datasets\n   - Verify response times for budget optimization recommendations\n   - Test memory usage during complex budget operations\n   - Validate database query efficiency for budget reporting\n\n4. User Acceptance Testing:\n   - Test zero-based budgeting workflow from user perspective\n   - Verify category management usability and intuitive operation\n   - Test budget recommendation accuracy and usefulness\n   - Validate reporting features meet user requirements for budget analysis",
-        "status": "pending",
-        "dependencies": [
-          21
-        ],
-        "priority": "medium",
-        "subtasks": []
-      },
-      {
-        "id": 23,
-        "title": "Phase 3: Transaction System",
-        "description": "Implement the full transaction system, including Plaid integration for bank account connections, the dual transaction system (Plaid + user), and real-time spending updates to envelopes.",
-        "details": "1. Complete Plaid Integration Setup:\n   - Implement Plaid Link for secure bank account connections using plaid v11.0.0\n   - Create PlaidConnectionManager for handling multiple bank accounts\n   - Implement OAuth flow for bank authorization and re-authentication\n   - Set up webhook endpoints for real-time transaction notifications\n\n2. Finalize Dual Transaction System:\n   - Complete the PlaidTransaction and UserTransaction dual table architecture\n   - Implement transaction reconciliation logic for matching Plaid imports with manual entries\n   - Create TransactionSyncManager for handling periodic sync operations\n   - Implement conflict resolution for duplicate transactions\n\n3. Real-time Envelope Updates:\n   - Integrate transaction processing with envelope balance updates\n   - Implement real-time spending notifications using WebSocket connections\n   - Create EnvelopeTransactionProcessor for automatic categorization and allocation\n   - Implement overspending alerts and envelope rebalancing suggestions\n\n4. Advanced Transaction Features:\n   - Implement transaction splitting across multiple envelopes\n   - Create recurring transaction detection and automation\n   - Implement merchant categorization using AI/ML models\n   - Add support for pending transaction handling and clearing\n\n5. Performance Optimization:\n   - Implement transaction caching using Redis for frequently accessed data\n   - Create batch processing for large transaction imports\n   - Implement database indexing for efficient transaction queries\n   - Add pagination and filtering for transaction history views\n\n6. Error Handling and Recovery:\n   - Implement robust error handling for Plaid API failures\n   - Create transaction rollback mechanisms for failed operations\n   - Implement retry logic for network failures and API rate limits\n   - Add comprehensive logging for transaction processing events",
-        "testStrategy": "1. Unit Testing:\n   - Test PlaidConnectionManager with mocked Plaid API responses\n   - Create comprehensive tests for transaction reconciliation logic\n   - Test envelope balance update calculations with various transaction scenarios\n   - Verify transaction splitting and categorization accuracy\n\n2. Integration Testing:\n   - Test end-to-end transaction flow from Plaid import to envelope allocation\n   - Verify real-time updates work correctly across multiple user sessions\n   - Test webhook handling for various Plaid transaction events\n   - Validate transaction sync performance with large datasets\n\n3. Performance Testing:\n   - Load test transaction processing with high-volume imports\n   - Benchmark real-time envelope update performance\n   - Test system behavior under concurrent transaction processing\n   - Verify caching effectiveness for transaction queries\n\n4. Security Testing:\n   - Validate Plaid OAuth implementation security\n   - Test transaction data encryption and secure storage\n   - Verify webhook endpoint security and authentication\n   - Test for potential transaction manipulation vulnerabilities\n\n5. User Acceptance Testing:\n   - Test bank connection flow with real bank accounts in sandbox\n   - Verify transaction categorization accuracy with real-world data\n   - Test envelope spending updates reflect correctly in UI\n   - Validate transaction history and search functionality",
-        "status": "pending",
-        "dependencies": [
-          22,
-          9,
-          5,
-          2
-        ],
-        "priority": "medium",
-        "subtasks": []
-      },
-      {
-        "id": 24,
-        "title": "Phase 4: Advanced Features",
-        "description": "Implement advanced features such as multi-user support for shared households, AI-powered spending insights and recommendations, and budget performance reporting.",
-        "details": "1. Multi-User Support for Shared Households:\n   - Implement user role management system with permissions (admin, member, viewer)\n   - Use Firebase Auth v9.22.2 for multi-user authentication\n   - Create SharedHouseholdManager class for managing household memberships\n   - Implement real-time synchronization using Socket.io v4.7.1\n   - Add conflict resolution for concurrent budget modifications\n   - Implement invitation system with email notifications\n   - Create household-level privacy controls and data sharing preferences\n\n2. AI-Powered Spending Insights and Recommendations:\n   - Extend existing AI features from Task 11 with advanced analytics\n   - Implement SpendingInsightEngine using TensorFlow.js v4.7.0\n   - Create recommendation algorithms for budget optimization\n   - Use clustering algorithms (K-means) for spending pattern categorization\n   - Implement anomaly detection for unusual spending behavior\n   - Create personalized financial coaching recommendations\n   - Use natural language processing for expense categorization suggestions\n\n3. Budget Performance Reporting:\n   - Implement comprehensive reporting dashboard using D3.js v7.8.4\n   - Create monthly/quarterly/yearly performance analytics\n   - Implement variance analysis comparing planned vs actual spending\n   - Use Chart.js v4.3.0 for interactive visualizations\n   - Create exportable reports in PDF format using jsPDF v2.5.1\n   - Implement goal achievement tracking and progress metrics\n   - Add benchmark comparisons and financial health scores\n\n4. Integration and Performance:\n   - Ensure seamless integration with existing core systems\n   - Implement caching strategies using Redis v7.0.11\n   - Add performance monitoring using New Relic v10.1.0\n   - Implement progressive loading for large datasets\n   - Add offline capability for core features using IndexedDB",
-        "testStrategy": "1. Multi-User Testing:\n   - Create unit tests for SharedHouseholdManager and permission systems\n   - Implement integration tests for real-time synchronization scenarios\n   - Test conflict resolution with concurrent user actions\n   - Use Playwright for end-to-end testing of multi-user workflows\n   - Test invitation system with mock email services\n\n2. AI Features Testing:\n   - Validate recommendation accuracy using historical spending data\n   - Implement A/B testing for different recommendation algorithms\n   - Test anomaly detection with synthetic unusual spending patterns\n   - Use cross-validation techniques for model performance evaluation\n   - Test NLP categorization with diverse expense descriptions\n\n3. Reporting Testing:\n   - Create unit tests for all calculation and aggregation functions\n   - Test report generation with various date ranges and data volumes\n   - Implement visual regression testing for dashboard components\n   - Test PDF export functionality across different browsers\n   - Validate performance with large datasets using load testing\n\n4. Integration Testing:\n   - Test backward compatibility with existing features\n   - Implement end-to-end testing covering all advanced features\n   - Test system performance under multi-user load scenarios\n   - Validate offline functionality and data synchronization\n   - Test security measures for shared household data access",
-        "status": "pending",
-        "dependencies": [
-          23
-        ],
-        "priority": "medium",
-        "subtasks": []
-      }
-    ],
-    "metadata": {
-      "created": "2025-06-19T21:21:46.380Z",
-      "updated": "2025-06-20T01:00:22.059Z",
-      "description": "Tasks for master context"
-    }
-  },
-  "budget-setup-completion": {
-    "tasks": [
-      {
-        "id": 1,
-        "title": "Modernize Envelopes Step UI Components",
-        "description": "Update the envelopes step in the budget setup flow to match the established UI patterns from income and expense steps, implementing summary cards with allocation amounts and CRUD operations.",
-        "details": "Create envelope summary cards using shadcn/ui components following the established pattern from income/expense steps. Implement add/edit/delete operations with proper form validation. Include rollover rule configuration UI with options: always roll over, roll over up to limit with excess to savings, always to savings. Use React Context for state management and ensure proper TypeScript interfaces. Components should be mobile-first with touch-friendly interactions using 4px grid spacing (4, 8, 12, 16, 24px).",
-        "testStrategy": "Unit tests for envelope CRUD operations, integration tests for rollover rule configuration, visual regression tests for UI consistency with income/expense patterns, mobile responsiveness testing across devices.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 2,
-        "title": "Modernize Savings Goals Step UI Components",
-        "description": "Update the savings goals step to match established UI patterns with summary cards, progress indicators, and CRUD operations for goal management including emergency fund prioritization.",
-        "details": "Create savings goal summary cards with progress indicators showing target amounts and completion percentages. Implement target amount and date configuration forms with validation. Add emergency fund priority handling with $1000 minimum requirement. Include CRUD operations following the established component patterns. Use shadcn/ui Progress component for visual progress tracking. Implement form state management with proper error handling and TypeScript interfaces.",
-        "testStrategy": "Unit tests for savings goal calculations and progress tracking, integration tests for emergency fund prioritization logic, form validation testing, accessibility testing for progress indicators.",
-        "priority": "high",
-        "dependencies": [
-          1
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 3,
-        "title": "Implement Budget Setup Flow Navigation and State Management",
-        "description": "Complete the end-to-end budget setup flow integration with proper navigation between all four steps (Income → Expenses → Envelopes → Savings Goals) and persistent state management.",
-        "details": "Implement React Context for managing budget setup state across all four steps. Create navigation components with step indicators and progress tracking. Ensure data persistence across steps using local storage as backup. Implement proper form state management with validation feedback. Add step completion validation before allowing navigation to next step. Include breadcrumb navigation and ability to go back to previous steps. Handle form state persistence when users navigate between steps.",
-        "testStrategy": "End-to-end testing of complete budget setup flow, state persistence testing across browser refreshes, navigation flow testing, form validation testing across all steps.",
-        "priority": "high",
-        "dependencies": [
-          1,
-          2
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 4,
-        "title": "Implement Paycheck Period Creation and Management System",
-        "description": "Build the core paycheck period logic with semi-monthly cycles, automatic period creation, and early paycheck handling capabilities.",
-        "details": "Implement paycheck period creation logic based on 15th + End of Month cycles. Create automatic period start functionality with configurable primary income source. Add manual override capability for early paycheck handling. Implement period status management (active, upcoming, completed). Create database operations for period_income, period_envelopes, period_fixed_expenses tables. Include period aggregation logic for multiple income sources. Add period transition logic and cleanup of completed periods.",
-        "testStrategy": "Unit tests for period calculation logic, integration tests for automatic period creation, edge case testing for month-end variations, testing early paycheck override functionality.",
-        "priority": "high",
-        "dependencies": [
-          3
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 5,
-        "title": "Build Zero-Based Budgeting Allocation System",
-        "description": "Implement the core zero-based budgeting system where every dollar gets assigned a purpose, with real-time tracking of allocated vs unallocated funds.",
-        "details": "Create allocation tracking system that ensures total allocations equal total income for each period. Implement real-time calculation of unallocated funds. Build allocation distribution logic across fixed expenses, envelopes, and savings goals. Add validation to prevent over-allocation. Create reallocation functionality for adjusting budgets mid-period. Implement allocation history tracking and rollback capabilities. Include visual indicators for allocation status and warnings for unallocated funds.",
-        "testStrategy": "Unit tests for allocation calculations, integration tests for real-time balance updates, edge case testing for over-allocation scenarios, performance testing for large numbers of allocations.",
-        "priority": "high",
-        "dependencies": [
-          4
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 6,
-        "title": "Implement Envelope Spending Tracking and Balance Management",
-        "description": "Build real-time envelope balance tracking with overspending alerts, rollover rule implementation, and spending category management.",
-        "details": "Implement real-time envelope balance calculations with spending deductions. Create overspending alert system with configurable thresholds. Build rollover rule engine supporting: always roll over, roll over up to limit with excess to savings, always to savings. Add envelope balance history tracking and spending pattern analysis. Implement envelope transfer functionality for moving funds between categories. Create spending limit warnings and budget adherence tracking. Include envelope performance metrics and recommendations.",
-        "testStrategy": "Unit tests for balance calculations and rollover logic, integration tests for overspending alerts, real-time update testing, rollover rule validation testing.",
-        "priority": "medium",
-        "dependencies": [
-          5
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 7,
-        "title": "Build Savings Goals Progress Tracking and Contribution System",
-        "description": "Implement savings goals with progress tracking, multiple contribution types (planned, overflow, roundup, manual), and achievement strategies.",
-        "details": "Create savings goal progress calculation engine with target date projections. Implement multiple contribution types: planned allocations, envelope overflow, transaction roundup, manual contributions. Build emergency fund prioritization logic with $1000 minimum requirement. Add achievement milestone tracking and celebration features. Create savings goal adjustment functionality for changing targets or timelines. Implement savings goal performance analytics and recommendations. Include visual progress indicators and completion forecasting.",
-        "testStrategy": "Unit tests for progress calculations and contribution logic, integration tests for emergency fund prioritization, achievement milestone testing, contribution type validation testing.",
-        "priority": "medium",
-        "dependencies": [
-          6
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 8,
-        "title": "Integrate Plaid Banking Connection and Transaction Import",
-        "description": "Implement Plaid integration for secure bank account connection and automatic transaction import with proper error handling and security measures.",
-        "details": "Integrate Plaid Link for secure bank account connection with proper OAuth flow. Implement transaction import functionality with deduplication logic. Create dual transaction system supporting both Plaid and manual transactions. Add transaction categorization mapping to envelopes, fixed expenses, and savings goals. Implement transaction sync scheduling and error handling. Create bank account management UI with connection status and re-authentication. Include transaction import history and audit logging. Add fallback manual transaction entry for unsupported banks.",
-        "testStrategy": "Integration tests with Plaid sandbox environment, transaction deduplication testing, error handling testing for connection failures, security testing for credential management.",
-        "priority": "medium",
-        "dependencies": [
-          7
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 9,
-        "title": "Implement AI-Powered Transaction Categorization and Budget Insights",
-        "description": "Build AI services for smart transaction categorization, spending pattern analysis, and personalized budget recommendations using the established data models.",
-        "details": "Implement AI categorization engine for automatic transaction classification using merchant names, amounts, and historical patterns. Create spending pattern analysis with trend identification and anomaly detection. Build personalized budget recommendation system based on spending history and goals. Implement smart category suggestions for new transactions. Create budget optimization recommendations for better allocation. Add spending insights dashboard with actionable recommendations. Include machine learning model training pipeline for improving categorization accuracy over time.",
-        "testStrategy": "Unit tests for categorization algorithms, accuracy testing with sample transaction data, A/B testing for recommendation effectiveness, performance testing for real-time categorization.",
-        "priority": "medium",
-        "dependencies": [
           8
         ],
         "status": "pending",
         "subtasks": []
-      },
-      {
-        "id": 10,
-        "title": "Implement Multi-User Household Management and Real-Time Sync",
-        "description": "Build shared household management capabilities with proper permissions, real-time synchronization, and collaborative budget management features.",
-        "details": "Implement household invitation system with email-based invitations and role management. Create real-time synchronization using Supabase subscriptions for shared budget updates. Build permission system for household member access control (admin, member, view-only). Implement collaborative editing with conflict resolution for simultaneous budget changes. Add activity logging and audit trail for household actions. Create household member management UI with role assignment. Include notification system for budget changes and important events. Implement proper Row Level Security policies for household data access.",
-        "testStrategy": "Integration tests for real-time sync functionality, permission testing for different user roles, concurrent editing testing, household invitation flow testing, security testing for data isolation between households.",
-        "priority": "low",
-        "dependencies": [
-          9
-        ],
-        "status": "pending",
-        "subtasks": []
       }
     ],
     "metadata": {
-      "created": "2025-06-20T01:04:51.967Z",
-      "updated": "2025-06-20T01:04:51.967Z",
-      "description": "Tasks for budget-setup-completion context"
+      "created": "2025-06-20T15:12:13.375Z",
+      "updated": "2025-06-20T15:25:23.399Z",
+      "description": "Tasks for master context"
     }
   }
 }

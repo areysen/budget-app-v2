@@ -1,0 +1,141 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: Git workflow integration with Task Master AI for branch-per-task development
+globs: **/*
+filesToApplyRule: **/*
+alwaysApply: true
+---
+
+## Git Task Workflow Integration
+
+- **Branch-Per-Task Pattern**
+  - Create feature branch for every Task Master AI task
+  - Use naming convention: `task/<id>-<brief-description>`
+  - Keep branches focused and short-lived
+  - Merge back to main when task is complete
+
+- **Starting a New Task**
+  - Always check current task: `task-master show <id>`
+  - Create branch immediately: `git checkout -b task/<id>-<description>`
+  - Examples:
+    ```bash
+    task-master show 15
+    git checkout -b task/15-fix-auth-context
+    git checkout -b task/23-envelope-summary-card
+    git checkout -b task/31-savings-goal-form
+    ```
+
+- **During Task Development**
+  - Make frequent, focused commits with task ID references
+  - Use conventional commit format with task tracking
+  - Commit message pattern:
+    ```
+    <type>(<scope>): <description> - Task #<id>
+    
+    <detailed description>
+    <acceptance criteria met>
+    <notes for reviewers>
+    ```
+
+- **Commit Message Examples**
+  ```bash
+  # ✅ DO: Clear, focused commits with task reference
+  git commit -m "feat(auth): fix household context persistence - Task #15
+
+  - Fixed useUser hook to persist householdId across navigation  
+  - Added context debugging and error recovery
+  - Updated auth state management patterns"
+
+  # ✅ DO: Progress commits during development
+  git commit -m "wip(components): add envelope summary card structure - Task #23"
+
+  # ❌ DON'T: Vague commits without task reference
+  git commit -m "fix stuff"
+  ```
+
+- **Task Completion Workflow**
+  - Make final commit summarizing completion
+  - Mark task done in Task Master: `task-master set-status --id=<id> --status=done`
+  - Merge to main and clean up branch
+  - Get next task: `task-master next`
+
+- **Complete Example Workflow**
+  ```bash
+  # 1. Select and start task
+  task-master next
+  git checkout -b task/15-fix-auth-context
+
+  # 2. Work and commit progress
+  git add .
+  git commit -m "feat(auth): investigate context loss issue - Task #15"
+  
+  # 3. Continue development
+  git add .
+  git commit -m "fix(auth): implement context recovery logic - Task #15"
+
+  # 4. Complete task
+  git add .
+  git commit -m "complete: Task #15 auth context fix ready for testing"
+  
+  # 5. Mark done and merge
+  task-master set-status --id=15 --status=done
+  git checkout main
+  git merge task/15-fix-auth-context
+  git branch -d task/15-fix-auth-context
+  git push origin main
+
+  # 6. Next task
+  task-master next
+  ```
+
+- **Claude AI Integration**
+  - Always suggest creating branch when starting task work
+  - Remind about frequent commits during development
+  - Guide through completion workflow when task is done
+  - Reference task IDs in all code discussions
+
+- **Branch Management Best Practices**
+  - Keep branches small and focused (1 task = 1 branch)
+  - Delete merged branches immediately
+  - Never work directly on main branch
+  - Use descriptive branch names that match task content
+
+- **Commit Types Reference**
+  - `feat`: New features or major functionality
+  - `fix`: Bug fixes and corrections  
+  - `refactor`: Code improvements without behavior change
+  - `style`: Formatting, linting, minor UI tweaks
+  - `docs`: Documentation updates
+  - `test`: Adding or updating tests
+  - `chore`: Build, config, or tooling changes
+  - `wip`: Work in progress (use sparingly)
+  - `complete`: Final commit marking task completion
+
+- **Integration with @dev_workflow.mdc**
+  - This Git workflow complements the Task Master AI workflow
+  - Use together for complete task-driven development
+  - Git branches map to Task Master AI task contexts
+  - Both systems work together for organized development
+
+- **Error Recovery**
+  - If context is lost: `git status` to check current branch
+  - If unsure which task: `task-master list` to see active tasks
+  - If branch conflicts: Use task ID to identify correct branch
+  - If merge issues: Reference task details for resolution guidance
+
+- **Team Collaboration Benefits**
+  - Clear history linking code changes to specific requirements
+  - Easy rollback of specific task implementations
+  - Isolated changes for better code review
+  - Parallel development without conflicts
+  - Traceability from git commits to task management
+
+- **Mobile/Quick Development**
+  - For quick fixes: Still create branch but use shorter names
+  - For experiments: Use `task/<id>-experiment-<description>`
+  - For hotfixes: Use `hotfix/<description>` and update tasks afterward
+  - Always reference task IDs even for quick changes
