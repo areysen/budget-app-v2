@@ -126,7 +126,7 @@ export function FixedExpenseForm({
     defaultValues: {
       name: expense?.name || "",
       category: expense?.category || "",
-      amount: expense?.estimated_amount || 0,
+      amount: expense?.estimated_amount ?? 0,
       isVariable: expense?.is_variable ?? false,
       notes: expense?.notes || "",
       frequency_type:
@@ -143,7 +143,7 @@ export function FixedExpenseForm({
       form.reset({
         name: expense.name || "",
         category: expense.category || "",
-        amount: expense.estimated_amount || 0,
+        amount: expense.estimated_amount ?? 0,
         isVariable: expense.is_variable ?? false,
         notes: expense.notes || "",
         frequency_type:
@@ -560,7 +560,7 @@ export function FixedExpenseForm({
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
                   <CategorySelector
-                    value={form.watch("category")}
+                    value={form.watch("category") || ""}
                     onChange={(value) => {
                       form.setValue("category", value); // ← Set the value first
                       form.trigger("category"); // ← Then trigger validation

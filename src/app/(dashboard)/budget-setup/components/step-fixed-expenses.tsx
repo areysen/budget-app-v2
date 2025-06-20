@@ -54,7 +54,7 @@ const mapDbExpenseToContext = (dbExpense: DbFixedExpense): FixedExpense => {
     id: dbExpense.id,
     name: dbExpense.name || "",
     category: dbExpense.category || "",
-    amount: dbExpense.estimated_amount ?? 0,
+    amount: dbExpense.estimated_amount || 0,
     isVariable: dbExpense.is_variable ?? false,
     notes: dbExpense.notes || undefined,
     frequency_type: dbExpense.frequency_type as FrequencyType | null,
@@ -161,7 +161,15 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
         if (!response.ok) throw new Error("Failed to load fixed expenses");
 
         const { expenses: loadedExpenses } = await response.json();
-        const dbExpenses: DbFixedExpense[] = loadedExpenses || [];
+        // Convert API response format to DB format
+        const dbExpenses: DbFixedExpense[] = loadedExpenses.map((exp: any) => ({
+          ...exp,
+          estimated_amount: exp.amount || 0,
+          household_id: userHouseholdId,
+          created_at: exp.created_at || new Date().toISOString(),
+          updated_at: exp.updated_at || new Date().toISOString(),
+          is_active: exp.is_active ?? true,
+        })) || [];
 
         setState((prev) => ({
           ...prev,
@@ -256,7 +264,25 @@ const StepFixedExpenses = forwardRef(function StepFixedExpenses(
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to save expense");
       }
-      const savedExpense: DbFixedExpense = await response.json();
+      const responseData = await response.json();
+      
+      // Convert API response back to DB format
+      const savedExpense: DbFixedExpense = {
+        id: responseData.id,
+        household_id: householdId,
+        name: responseData.name,
+        category: responseData.category,
+        estimated_amount: responseData.amount,
+        is_variable: responseData.isVariable,
+        notes: responseData.notes,
+        frequency_type: responseData.frequency_type,
+        frequency_config: responseData.frequency_config,
+        anchor_date: responseData.anchor_date,
+        next_due_date: responseData.next_due_date,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_active: true,
+      };
 
       const updatedExpenses = isEditing
         ? state.expenses.map((exp) =>

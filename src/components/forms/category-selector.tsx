@@ -142,9 +142,14 @@ export function CategorySelector({
   }
 
   // Normal select state
+  // Ensure value is either a valid category or undefined for the placeholder to show
+  const selectValue = value && (SUGGESTED_CATEGORIES.includes(value) || availableCategories.includes(value)) 
+    ? value 
+    : undefined;
+    
   return (
     <div className="space-y-2">
-      <Select value={value} onValueChange={handleSelectChange}>
+      <Select value={selectValue} onValueChange={handleSelectChange}>
         <SelectTrigger
           className={`${className} ${error ? "border-destructive" : ""}`}
         >
