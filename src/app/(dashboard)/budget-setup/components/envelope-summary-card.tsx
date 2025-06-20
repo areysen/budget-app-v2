@@ -1,15 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils/currency";
+import { Envelope } from "../budget-setup-context";
 
 interface EnvelopeSummaryCardProps {
-  envelope: {
-    id: string;
-    name: string;
-    default_amount: number;
-    rollover_rule: "always_rollover" | "rollover_limit" | "always_to_savings";
-    rollover_limit?: number;
-  };
+  envelope: Envelope;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -21,12 +16,12 @@ export function EnvelopeSummaryCard({
 }: EnvelopeSummaryCardProps) {
   // Format rollover rule for display
   const getRolloverText = () => {
-    switch (envelope.rollover_rule) {
+    switch (envelope.rolloverRule) {
       case "always_rollover":
         return "Always rolls over";
       case "rollover_limit":
         return `Rolls over up to ${formatCurrency(
-          envelope.rollover_limit || 0
+          envelope.rolloverLimit || 0
         )}`;
       case "always_to_savings":
         return "Excess goes to savings";
@@ -41,7 +36,7 @@ export function EnvelopeSummaryCard({
         <div>
           <h3 className="font-medium">{envelope.name}</h3>
           <p className="text-sm text-muted-foreground">
-            {formatCurrency(envelope.default_amount)} per period
+            {formatCurrency(envelope.amount)} per period
           </p>
           <p className="text-xs text-muted-foreground">{getRolloverText()}</p>
         </div>

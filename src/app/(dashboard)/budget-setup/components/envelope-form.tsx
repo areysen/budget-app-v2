@@ -20,33 +20,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { Envelope } from "../budget-setup-context";
 
 // Validation schema
 const envelopeSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
-  default_amount: z.coerce.number().positive("Amount must be greater than 0"),
-  rollover_rule: z.enum([
+  amount: z.coerce.number().positive("Amount must be greater than 0"),
+  rolloverRule: z.enum([
     "always_rollover",
     "rollover_limit",
     "always_to_savings",
   ]),
-  rollover_limit: z.coerce.number().positive().optional().nullable(),
-  household_id: z.string(),
+  rolloverLimit: z.coerce.number().positive().optional(),
 });
 
 type EnvelopeFormValues = z.infer<typeof envelopeSchema>;
 
 interface EnvelopeFormProps {
-  envelope?: EnvelopeFormValues;
+  initialData?: Envelope | null;
   householdId: string;
-  onSave: (envelope: EnvelopeFormValues) => void;
+  onSave: (envelope: Omit<Envelope, "id">) => void;
   onCancel: () => void;
-  saving: boolean;
+  saving?: boolean;
 }
 
 export function EnvelopeForm({
-  envelope,
+  initialData,
   householdId,
   onSave,
   onCancel,
@@ -54,12 +54,11 @@ export function EnvelopeForm({
 }: EnvelopeFormProps) {
   // Default values
   const defaultValues: Partial<EnvelopeFormValues> = {
-    name: "",
-    default_amount: 0,
-    rollover_rule: "always_rollover",
-    rollover_limit: null,
-    household_id: householdId,
-    ...envelope,
+    name: initialData?.name || "",
+    amount: initialData?.amount || 0,
+    rolloverRule: initialData?.rolloverRule || "always_rollover",
+    rolloverLimit: initialData?.rolloverLimit,
+    ...(initialData?.id && { id: initialData.id }),
   };
 
   const form = useForm<EnvelopeFormValues>({
@@ -68,16 +67,16 @@ export function EnvelopeForm({
   });
 
   // Watch rollover rule to conditionally show rollover limit
-  const rolloverRule = form.watch("rollover_rule");
+  const rolloverRule = form.watch("rolloverRule");
   const showRolloverLimit = rolloverRule === "rollover_limit";
 
   // Handle form submission
   const onSubmit = (values: EnvelopeFormValues) => {
-    // If rollover rule is not rollover_limit, set limit to null
-    if (values.rollover_rule !== "rollover_limit") {
-      values.rollover_limit = null;
+    if (values.rolloverRule !== "rollover_limit") {
+      values.rolloverLimit = undefined;
     }
-    onSave(values);
+    const { id, ...saveData } = values;
+    onSave(saveData);
   };
 
   return (
@@ -102,7 +101,7 @@ export function EnvelopeForm({
 
         <FormField
           control={form.control}
-          name="default_amount"
+          name="amount"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Amount per Period</FormLabel>
@@ -119,7 +118,7 @@ export function EnvelopeForm({
 
         <FormField
           control={form.control}
-          name="rollover_rule"
+          name="rolloverRule"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rollover Rule</FormLabel>
@@ -157,7 +156,7 @@ export function EnvelopeForm({
         {showRolloverLimit && (
           <FormField
             control={form.control}
-            name="rollover_limit"
+            name="rolloverLimit"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Rollover Limit</FormLabel>

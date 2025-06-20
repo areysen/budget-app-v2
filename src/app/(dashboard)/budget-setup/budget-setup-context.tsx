@@ -51,6 +51,7 @@ export interface BudgetFixedExpensesStep {
 }
 
 export interface Envelope {
+  id: string;
   name: string;
   amount: number;
   rolloverRule: "always_rollover" | "rollover_limit" | "always_to_savings";
@@ -101,9 +102,9 @@ export type BudgetSetupContextType = {
   addSavingsGoal: (goal: SavingsGoal) => void;
   removeSavingsGoal: (id: string) => void;
   updateSavingsGoal: (id: string, goal: SavingsGoal) => void;
-  addEnvelope: (envelope: Envelope) => void;
+  addEnvelope: (envelope: Omit<Envelope, "id">) => void;
   removeEnvelope: (id: string) => void;
-  updateEnvelope: (id: string, envelope: Envelope) => void;
+  updateEnvelope: (id: string, envelope: Partial<Omit<Envelope, "id">>) => void;
   reset: () => void;
 };
 
@@ -256,7 +257,10 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({
             ...prev,
             envelopes: {
-              envelopes: [...(prev.envelopes?.envelopes || []), envelope],
+              envelopes: [
+                ...(prev.envelopes?.envelopes || []),
+                { ...envelope, id: crypto.randomUUID() },
+              ],
             },
           }));
         },
@@ -266,9 +270,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
             return {
               ...prev,
               envelopes: {
-                envelopes: prev.envelopes.envelopes.filter(
-                  (e) => e.name !== id
-                ),
+                envelopes: prev.envelopes.envelopes.filter((e) => e.id !== id),
               },
             };
           });
@@ -280,7 +282,7 @@ export function BudgetSetupProvider({ children }: { children: ReactNode }) {
               ...prev,
               envelopes: {
                 envelopes: prev.envelopes.envelopes.map((e) =>
-                  e.name === id ? envelope : e
+                  e.id === id ? { ...e, ...envelope } : e
                 ),
               },
             };
