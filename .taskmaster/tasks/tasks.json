@@ -9,7 +9,7 @@
         "testStrategy": "Verify that all tools and configurations are working correctly by running sample commands and checks.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -22,7 +22,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -35,7 +35,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -49,21 +49,21 @@
           2,
           3
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
         "id": 5,
         "title": "Implement Envelope System",
-        "description": "Develop the envelope system for managing spending categories with allocated amounts and real-time balance tracking.",
-        "details": "1. Create an EnvelopeManager class to handle envelope operations\n2. Implement methods for:\n   - Creating and modifying envelopes\n   - Tracking real-time balances\n   - Handling different rollover behaviors\n   - Transferring money between envelopes\n3. Use the Strategy pattern for different rollover behaviors\n4. Implement a pub/sub system using RxJS v7.8.1 for real-time updates\n5. Create an OverspendingMonitor to detect and alert on overspending\n6. Use Immer v10.0.2 for immutable state updates",
-        "testStrategy": "Create unit tests for EnvelopeManager and OverspendingMonitor. Include tests for different rollover scenarios and overspending situations. Use RxJS TestScheduler for testing asynchronous behavior.",
-        "priority": "high",
+        "description": "Phase 1: Modernize Envelopes Step - Update the envelope system UI to match established income/expense patterns and integrate with the budget setup flow's state management.",
+        "status": "in-progress",
         "dependencies": [
           2,
           4
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "1. Update envelope UI components to match income/expense patterns:\n   - Implement summary cards displaying allocation amounts\n   - Create consistent Add/Edit/Delete operations following established patterns\n   - Design UI for configuring rollover rules\n2. Integrate with budget setup flow state management:\n   - Connect envelope operations to existing state management system\n   - Ensure seamless data flow between budget setup and envelope management\n3. Create an EnvelopeManager class to handle envelope operations\n4. Implement methods for:\n   - Creating and modifying envelopes\n   - Tracking real-time balances\n   - Handling different rollover behaviors\n   - Transferring money between envelopes\n5. Use the Strategy pattern for different rollover behaviors\n6. Implement a pub/sub system using RxJS v7.8.1 for real-time updates\n7. Create an OverspendingMonitor to detect and alert on overspending\n8. Use Immer v10.0.2 for immutable state updates",
+        "testStrategy": "Create unit tests for EnvelopeManager and OverspendingMonitor. Include tests for different rollover scenarios and overspending situations. Use RxJS TestScheduler for testing asynchronous behavior. Test UI components for proper integration with state management and consistent behavior with income/expense patterns.",
         "subtasks": []
       },
       {
@@ -77,21 +77,21 @@
           2,
           4
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
         "id": 7,
         "title": "Implement Vaults System",
-        "description": "Develop the vaults system for managing long-term savings goals and safety nets.",
-        "details": "1. Create a VaultManager class to handle vault operations\n2. Implement methods for:\n   - Creating and modifying vaults\n   - Tracking progress towards goals\n   - Handling automatic contributions (fixed and variable)\n3. Implement specific logic for Emergency Fund, General Savings, Roundup Vault, and Big Ticket Items\n4. Use the Strategy pattern for different contribution strategies\n5. Implement a GoalTracker to monitor progress and provide insights\n6. Use Chart.js v4.3.0 for visualizing progress towards goals",
-        "testStrategy": "Create unit tests for VaultManager and GoalTracker. Include tests for different contribution scenarios, goal tracking accuracy, and visualization data generation.",
-        "priority": "high",
+        "description": "Phase 1: Modernize Savings Goals Step - Update the UI to match established patterns and implement comprehensive vault management functionality.",
+        "status": "in-progress",
         "dependencies": [
           2,
           4
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "1. Update UI to match established design patterns:\n   - Implement summary cards with progress indicators for each vault\n   - Create configuration interface for target amounts and dates\n   - Build UI for emergency fund prioritization handling\n   - Implement full Add/Edit/Delete operations with comprehensive form validation\n\n2. Backend vault system implementation:\n   - Create a VaultManager class to handle vault operations\n   - Implement methods for creating, modifying, and deleting vaults\n   - Track progress towards goals with visual indicators\n   - Handle automatic contributions (fixed and variable)\n\n3. Implement specific vault types:\n   - Emergency Fund with prioritization logic\n   - General Savings with flexible goals\n   - Roundup Vault for spare change collection\n   - Big Ticket Items with milestone tracking\n\n4. Use the Strategy pattern for different contribution strategies\n5. Implement a GoalTracker to monitor progress and provide insights\n6. Use Chart.js v4.3.0 for visualizing progress towards goals in summary cards",
+        "testStrategy": "Create unit tests for VaultManager and GoalTracker. Include tests for different contribution scenarios, goal tracking accuracy, visualization data generation, and form validation. Test UI components for proper rendering of summary cards, progress indicators, and CRUD operations.",
         "subtasks": []
       },
       {
@@ -104,7 +104,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -120,7 +120,7 @@
           6,
           7
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -179,7 +179,7 @@
           10,
           11
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -193,7 +193,7 @@
           8,
           12
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -270,7 +270,7 @@
           12,
           15
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": []
       },
       {
@@ -301,12 +301,206 @@
         ],
         "status": "pending",
         "subtasks": []
+      },
+      {
+        "id": 21,
+        "title": "Phase 1: Complete Budget Setup Flow Integration",
+        "description": "Conduct end-to-end testing of the entire budget setup wizard, ensuring smooth navigation between all four steps (Income, Expenses, Envelopes, Savings Goals), proper data persistence, and robust state management.",
+        "details": "1. Implement comprehensive integration testing for the budget setup wizard flow\n2. Test navigation between Income Setup, Expenses Configuration, Envelope Creation, and Savings Goals steps\n3. Verify data persistence across all wizard steps using AsyncStorage or SQLite\n4. Implement state management validation using Redux or Context API\n5. Test form validation and error handling at each step\n6. Verify proper data flow between components and ensure no data loss during navigation\n7. Implement rollback functionality for incomplete wizard sessions\n8. Test wizard completion and final budget creation process\n9. Validate that all user inputs are properly sanitized and stored\n10. Implement progress tracking and step completion indicators\n11. Test wizard behavior under various device states (low memory, network interruption)\n12. Ensure proper cleanup of temporary data on wizard cancellation\n13. Implement accessibility testing for the entire wizard flow\n14. Test responsive design across different screen sizes and orientations\n15. Validate integration with existing budget management systems",
+        "testStrategy": "Create automated end-to-end tests using Detox to simulate complete wizard flows from start to finish. Implement unit tests for each wizard step component and state management logic. Test data persistence by interrupting the wizard at various points and verifying data recovery. Use React Native Testing Library to test component interactions and form validations. Implement visual regression testing for all wizard screens using jest-image-snapshot. Test accessibility compliance using react-native-accessibility-engine. Conduct manual testing on multiple devices to verify responsive design and performance. Test error scenarios including network failures, validation errors, and incomplete data submissions. Verify proper integration with backend services and data synchronization.",
+        "status": "pending",
+        "dependencies": [
+          4,
+          6
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 22,
+        "title": "Phase 2: Budget Management",
+        "description": "Implement core budget management logic, including paycheck period creation, zero-based budget calculations, and enhanced category management. This corresponds to Phase 2 (Weeks 3-4) in the PRD.",
+        "details": "1. Enhance PaycheckPeriodManager to support advanced period management:\n   - Implement automatic period rollover with budget reset functionality\n   - Add support for irregular income periods and manual adjustments\n   - Create period comparison and historical analysis features\n   - Implement period-based budget templates and presets\n\n2. Develop zero-based budgeting engine:\n   - Create BudgetCalculator class for zero-based budget calculations\n   - Implement income allocation algorithms ensuring every dollar is assigned\n   - Add validation to prevent over-allocation and enforce budget balance\n   - Create budget variance tracking and reporting functionality\n\n3. Enhanced category management system:\n   - Extend existing envelope and vault categories with subcategories\n   - Implement category hierarchy with parent-child relationships\n   - Add category-based spending analytics and trend analysis\n   - Create category templates for quick budget setup\n\n4. Budget optimization features:\n   - Implement budget recommendation engine based on spending patterns\n   - Add automatic category rebalancing suggestions\n   - Create budget health scoring and improvement recommendations\n   - Implement seasonal budget adjustments and planning tools\n\n5. Integration with existing systems:\n   - Enhance EnvelopeManager integration for advanced envelope operations\n   - Extend VaultManager for goal-based budget allocation\n   - Integrate with existing data models for seamless data flow\n   - Implement real-time budget updates and synchronization\n\n6. Advanced budget reporting:\n   - Create comprehensive budget vs. actual reporting\n   - Implement budget forecasting and projection features\n   - Add export functionality for budget data and reports\n   - Create visual budget dashboards and progress tracking",
+        "testStrategy": "1. Unit Testing:\n   - Test BudgetCalculator for accurate zero-based calculations and edge cases\n   - Verify PaycheckPeriodManager enhancements with various period scenarios\n   - Test category management operations including hierarchy creation and validation\n   - Validate budget optimization algorithms with different spending patterns\n\n2. Integration Testing:\n   - Test seamless integration with existing EnvelopeManager and VaultManager\n   - Verify data flow between budget management and existing data models\n   - Test real-time synchronization and update mechanisms\n   - Validate budget template and preset functionality\n\n3. Performance Testing:\n   - Test budget calculation performance with large datasets\n   - Verify response times for budget optimization recommendations\n   - Test memory usage during complex budget operations\n   - Validate database query efficiency for budget reporting\n\n4. User Acceptance Testing:\n   - Test zero-based budgeting workflow from user perspective\n   - Verify category management usability and intuitive operation\n   - Test budget recommendation accuracy and usefulness\n   - Validate reporting features meet user requirements for budget analysis",
+        "status": "pending",
+        "dependencies": [
+          21
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 23,
+        "title": "Phase 3: Transaction System",
+        "description": "Implement the full transaction system, including Plaid integration for bank account connections, the dual transaction system (Plaid + user), and real-time spending updates to envelopes.",
+        "details": "1. Complete Plaid Integration Setup:\n   - Implement Plaid Link for secure bank account connections using plaid v11.0.0\n   - Create PlaidConnectionManager for handling multiple bank accounts\n   - Implement OAuth flow for bank authorization and re-authentication\n   - Set up webhook endpoints for real-time transaction notifications\n\n2. Finalize Dual Transaction System:\n   - Complete the PlaidTransaction and UserTransaction dual table architecture\n   - Implement transaction reconciliation logic for matching Plaid imports with manual entries\n   - Create TransactionSyncManager for handling periodic sync operations\n   - Implement conflict resolution for duplicate transactions\n\n3. Real-time Envelope Updates:\n   - Integrate transaction processing with envelope balance updates\n   - Implement real-time spending notifications using WebSocket connections\n   - Create EnvelopeTransactionProcessor for automatic categorization and allocation\n   - Implement overspending alerts and envelope rebalancing suggestions\n\n4. Advanced Transaction Features:\n   - Implement transaction splitting across multiple envelopes\n   - Create recurring transaction detection and automation\n   - Implement merchant categorization using AI/ML models\n   - Add support for pending transaction handling and clearing\n\n5. Performance Optimization:\n   - Implement transaction caching using Redis for frequently accessed data\n   - Create batch processing for large transaction imports\n   - Implement database indexing for efficient transaction queries\n   - Add pagination and filtering for transaction history views\n\n6. Error Handling and Recovery:\n   - Implement robust error handling for Plaid API failures\n   - Create transaction rollback mechanisms for failed operations\n   - Implement retry logic for network failures and API rate limits\n   - Add comprehensive logging for transaction processing events",
+        "testStrategy": "1. Unit Testing:\n   - Test PlaidConnectionManager with mocked Plaid API responses\n   - Create comprehensive tests for transaction reconciliation logic\n   - Test envelope balance update calculations with various transaction scenarios\n   - Verify transaction splitting and categorization accuracy\n\n2. Integration Testing:\n   - Test end-to-end transaction flow from Plaid import to envelope allocation\n   - Verify real-time updates work correctly across multiple user sessions\n   - Test webhook handling for various Plaid transaction events\n   - Validate transaction sync performance with large datasets\n\n3. Performance Testing:\n   - Load test transaction processing with high-volume imports\n   - Benchmark real-time envelope update performance\n   - Test system behavior under concurrent transaction processing\n   - Verify caching effectiveness for transaction queries\n\n4. Security Testing:\n   - Validate Plaid OAuth implementation security\n   - Test transaction data encryption and secure storage\n   - Verify webhook endpoint security and authentication\n   - Test for potential transaction manipulation vulnerabilities\n\n5. User Acceptance Testing:\n   - Test bank connection flow with real bank accounts in sandbox\n   - Verify transaction categorization accuracy with real-world data\n   - Test envelope spending updates reflect correctly in UI\n   - Validate transaction history and search functionality",
+        "status": "pending",
+        "dependencies": [
+          22,
+          9,
+          5,
+          2
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 24,
+        "title": "Phase 4: Advanced Features",
+        "description": "Implement advanced features such as multi-user support for shared households, AI-powered spending insights and recommendations, and budget performance reporting.",
+        "details": "1. Multi-User Support for Shared Households:\n   - Implement user role management system with permissions (admin, member, viewer)\n   - Use Firebase Auth v9.22.2 for multi-user authentication\n   - Create SharedHouseholdManager class for managing household memberships\n   - Implement real-time synchronization using Socket.io v4.7.1\n   - Add conflict resolution for concurrent budget modifications\n   - Implement invitation system with email notifications\n   - Create household-level privacy controls and data sharing preferences\n\n2. AI-Powered Spending Insights and Recommendations:\n   - Extend existing AI features from Task 11 with advanced analytics\n   - Implement SpendingInsightEngine using TensorFlow.js v4.7.0\n   - Create recommendation algorithms for budget optimization\n   - Use clustering algorithms (K-means) for spending pattern categorization\n   - Implement anomaly detection for unusual spending behavior\n   - Create personalized financial coaching recommendations\n   - Use natural language processing for expense categorization suggestions\n\n3. Budget Performance Reporting:\n   - Implement comprehensive reporting dashboard using D3.js v7.8.4\n   - Create monthly/quarterly/yearly performance analytics\n   - Implement variance analysis comparing planned vs actual spending\n   - Use Chart.js v4.3.0 for interactive visualizations\n   - Create exportable reports in PDF format using jsPDF v2.5.1\n   - Implement goal achievement tracking and progress metrics\n   - Add benchmark comparisons and financial health scores\n\n4. Integration and Performance:\n   - Ensure seamless integration with existing core systems\n   - Implement caching strategies using Redis v7.0.11\n   - Add performance monitoring using New Relic v10.1.0\n   - Implement progressive loading for large datasets\n   - Add offline capability for core features using IndexedDB",
+        "testStrategy": "1. Multi-User Testing:\n   - Create unit tests for SharedHouseholdManager and permission systems\n   - Implement integration tests for real-time synchronization scenarios\n   - Test conflict resolution with concurrent user actions\n   - Use Playwright for end-to-end testing of multi-user workflows\n   - Test invitation system with mock email services\n\n2. AI Features Testing:\n   - Validate recommendation accuracy using historical spending data\n   - Implement A/B testing for different recommendation algorithms\n   - Test anomaly detection with synthetic unusual spending patterns\n   - Use cross-validation techniques for model performance evaluation\n   - Test NLP categorization with diverse expense descriptions\n\n3. Reporting Testing:\n   - Create unit tests for all calculation and aggregation functions\n   - Test report generation with various date ranges and data volumes\n   - Implement visual regression testing for dashboard components\n   - Test PDF export functionality across different browsers\n   - Validate performance with large datasets using load testing\n\n4. Integration Testing:\n   - Test backward compatibility with existing features\n   - Implement end-to-end testing covering all advanced features\n   - Test system performance under multi-user load scenarios\n   - Validate offline functionality and data synchronization\n   - Test security measures for shared household data access",
+        "status": "pending",
+        "dependencies": [
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-06-19T21:21:46.380Z",
-      "updated": "2025-06-19T21:22:24.812Z",
+      "updated": "2025-06-20T01:00:22.059Z",
       "description": "Tasks for master context"
+    }
+  },
+  "budget-setup-completion": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Modernize Envelopes Step UI Components",
+        "description": "Update the envelopes step in the budget setup flow to match the established UI patterns from income and expense steps, implementing summary cards with allocation amounts and CRUD operations.",
+        "details": "Create envelope summary cards using shadcn/ui components following the established pattern from income/expense steps. Implement add/edit/delete operations with proper form validation. Include rollover rule configuration UI with options: always roll over, roll over up to limit with excess to savings, always to savings. Use React Context for state management and ensure proper TypeScript interfaces. Components should be mobile-first with touch-friendly interactions using 4px grid spacing (4, 8, 12, 16, 24px).",
+        "testStrategy": "Unit tests for envelope CRUD operations, integration tests for rollover rule configuration, visual regression tests for UI consistency with income/expense patterns, mobile responsiveness testing across devices.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Modernize Savings Goals Step UI Components",
+        "description": "Update the savings goals step to match established UI patterns with summary cards, progress indicators, and CRUD operations for goal management including emergency fund prioritization.",
+        "details": "Create savings goal summary cards with progress indicators showing target amounts and completion percentages. Implement target amount and date configuration forms with validation. Add emergency fund priority handling with $1000 minimum requirement. Include CRUD operations following the established component patterns. Use shadcn/ui Progress component for visual progress tracking. Implement form state management with proper error handling and TypeScript interfaces.",
+        "testStrategy": "Unit tests for savings goal calculations and progress tracking, integration tests for emergency fund prioritization logic, form validation testing, accessibility testing for progress indicators.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Implement Budget Setup Flow Navigation and State Management",
+        "description": "Complete the end-to-end budget setup flow integration with proper navigation between all four steps (Income → Expenses → Envelopes → Savings Goals) and persistent state management.",
+        "details": "Implement React Context for managing budget setup state across all four steps. Create navigation components with step indicators and progress tracking. Ensure data persistence across steps using local storage as backup. Implement proper form state management with validation feedback. Add step completion validation before allowing navigation to next step. Include breadcrumb navigation and ability to go back to previous steps. Handle form state persistence when users navigate between steps.",
+        "testStrategy": "End-to-end testing of complete budget setup flow, state persistence testing across browser refreshes, navigation flow testing, form validation testing across all steps.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement Paycheck Period Creation and Management System",
+        "description": "Build the core paycheck period logic with semi-monthly cycles, automatic period creation, and early paycheck handling capabilities.",
+        "details": "Implement paycheck period creation logic based on 15th + End of Month cycles. Create automatic period start functionality with configurable primary income source. Add manual override capability for early paycheck handling. Implement period status management (active, upcoming, completed). Create database operations for period_income, period_envelopes, period_fixed_expenses tables. Include period aggregation logic for multiple income sources. Add period transition logic and cleanup of completed periods.",
+        "testStrategy": "Unit tests for period calculation logic, integration tests for automatic period creation, edge case testing for month-end variations, testing early paycheck override functionality.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Build Zero-Based Budgeting Allocation System",
+        "description": "Implement the core zero-based budgeting system where every dollar gets assigned a purpose, with real-time tracking of allocated vs unallocated funds.",
+        "details": "Create allocation tracking system that ensures total allocations equal total income for each period. Implement real-time calculation of unallocated funds. Build allocation distribution logic across fixed expenses, envelopes, and savings goals. Add validation to prevent over-allocation. Create reallocation functionality for adjusting budgets mid-period. Implement allocation history tracking and rollback capabilities. Include visual indicators for allocation status and warnings for unallocated funds.",
+        "testStrategy": "Unit tests for allocation calculations, integration tests for real-time balance updates, edge case testing for over-allocation scenarios, performance testing for large numbers of allocations.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement Envelope Spending Tracking and Balance Management",
+        "description": "Build real-time envelope balance tracking with overspending alerts, rollover rule implementation, and spending category management.",
+        "details": "Implement real-time envelope balance calculations with spending deductions. Create overspending alert system with configurable thresholds. Build rollover rule engine supporting: always roll over, roll over up to limit with excess to savings, always to savings. Add envelope balance history tracking and spending pattern analysis. Implement envelope transfer functionality for moving funds between categories. Create spending limit warnings and budget adherence tracking. Include envelope performance metrics and recommendations.",
+        "testStrategy": "Unit tests for balance calculations and rollover logic, integration tests for overspending alerts, real-time update testing, rollover rule validation testing.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Build Savings Goals Progress Tracking and Contribution System",
+        "description": "Implement savings goals with progress tracking, multiple contribution types (planned, overflow, roundup, manual), and achievement strategies.",
+        "details": "Create savings goal progress calculation engine with target date projections. Implement multiple contribution types: planned allocations, envelope overflow, transaction roundup, manual contributions. Build emergency fund prioritization logic with $1000 minimum requirement. Add achievement milestone tracking and celebration features. Create savings goal adjustment functionality for changing targets or timelines. Implement savings goal performance analytics and recommendations. Include visual progress indicators and completion forecasting.",
+        "testStrategy": "Unit tests for progress calculations and contribution logic, integration tests for emergency fund prioritization, achievement milestone testing, contribution type validation testing.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Integrate Plaid Banking Connection and Transaction Import",
+        "description": "Implement Plaid integration for secure bank account connection and automatic transaction import with proper error handling and security measures.",
+        "details": "Integrate Plaid Link for secure bank account connection with proper OAuth flow. Implement transaction import functionality with deduplication logic. Create dual transaction system supporting both Plaid and manual transactions. Add transaction categorization mapping to envelopes, fixed expenses, and savings goals. Implement transaction sync scheduling and error handling. Create bank account management UI with connection status and re-authentication. Include transaction import history and audit logging. Add fallback manual transaction entry for unsupported banks.",
+        "testStrategy": "Integration tests with Plaid sandbox environment, transaction deduplication testing, error handling testing for connection failures, security testing for credential management.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Implement AI-Powered Transaction Categorization and Budget Insights",
+        "description": "Build AI services for smart transaction categorization, spending pattern analysis, and personalized budget recommendations using the established data models.",
+        "details": "Implement AI categorization engine for automatic transaction classification using merchant names, amounts, and historical patterns. Create spending pattern analysis with trend identification and anomaly detection. Build personalized budget recommendation system based on spending history and goals. Implement smart category suggestions for new transactions. Create budget optimization recommendations for better allocation. Add spending insights dashboard with actionable recommendations. Include machine learning model training pipeline for improving categorization accuracy over time.",
+        "testStrategy": "Unit tests for categorization algorithms, accuracy testing with sample transaction data, A/B testing for recommendation effectiveness, performance testing for real-time categorization.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement Multi-User Household Management and Real-Time Sync",
+        "description": "Build shared household management capabilities with proper permissions, real-time synchronization, and collaborative budget management features.",
+        "details": "Implement household invitation system with email-based invitations and role management. Create real-time synchronization using Supabase subscriptions for shared budget updates. Build permission system for household member access control (admin, member, view-only). Implement collaborative editing with conflict resolution for simultaneous budget changes. Add activity logging and audit trail for household actions. Create household member management UI with role assignment. Include notification system for budget changes and important events. Implement proper Row Level Security policies for household data access.",
+        "testStrategy": "Integration tests for real-time sync functionality, permission testing for different user roles, concurrent editing testing, household invitation flow testing, security testing for data isolation between households.",
+        "priority": "low",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-06-20T01:04:51.967Z",
+      "updated": "2025-06-20T01:04:51.967Z",
+      "description": "Tasks for budget-setup-completion context"
     }
   }
 }
